@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>7L — Help</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { max-width: 760px; margin: 0 auto; padding: 30px 20px; }
+    h1 { font-family: 'DSEG7', monospace; font-size: 28px; color: #58a6ff; margin-bottom: 4px; letter-spacing: 2px; }
+    .subtitle { color: #8b949e; font-size: 14px; margin-bottom: 30px; }
+    h2 { font-size: 16px; color: #c9d1d9; margin: 24px 0 10px; border-bottom: 1px solid #21262d; padding-bottom: 6px; }
+    h2 .emoji { margin-right: 6px; }
+    p, li { font-size: 14px; line-height: 1.7; color: #8b949e; }
+    ul { padding-left: 20px; margin: 8px 0; }
+    li { margin-bottom: 4px; }
+    strong { color: #c9d1d9; }
+    code { background: #161b22; padding: 1px 6px; border-radius: 4px; font-size: 13px; color: #58a6ff; }
+    .step { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; }
+    .step-num { background: #1f6feb; color: #fff; font-size: 12px; font-weight: 600; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+    .feature-card { background: #161b22; border: 1px solid #21262d; border-radius: 6px; padding: 12px; }
+    .feature-card .title { font-size: 14px; font-weight: 600; color: #c9d1d9; margin-bottom: 4px; }
+    .feature-card .desc { font-size: 12px; color: #8b949e; line-height: 1.5; }
+    .back-link { display: inline-block; margin-top: 30px; color: #8b949e; text-decoration: none; font-size: 14px; }
+    .back-link:hover { color: #58a6ff; }
+    @media (max-width: 600px) { .feature-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>7L</h1>
+  <div class="subtitle">llama.cpp Model Manager</div>
+
+  <p>7L is a lightweight web UI for running and managing multiple <strong>llama.cpp</strong> server instances side by side. Each model runs as a separate process with its own arguments, environment variables, and runtime binary.</p>
+
+  <h2><span class="emoji">🚀</span>Quick Start</h2>
+
+  <div class="step"><span class="step-num">1</span><span>Click <strong>➕</strong> in the header to add a card. Give it a nickname.</span></div>
+  <div class="step"><span class="step-num">2</span><span>Use <strong>📐 Constructor mode</strong> to pick a model file (<code>-m</code>), set context size (<code>--ctx-size</code>), and add other parameters.</span></div>
+  <div class="step"><span class="step-num">3</span><span>Optionally set a <strong>custom runtime</strong> by clicking <strong>🦙</strong> on the card, or configure a global runtime in the header 🦙.</span></div>
+  <div class="step"><span class="step-num">4</span><span>Switch to <strong>💲 Env mode</strong> to add environment variables (<code>KEY=VALUE</code>, one per line) if needed.</span></div>
+  <div class="step"><span class="step-num">5</span><span>Click <strong style="color:#3fb950">▶ Run</strong>. The status dot turns <span style="color:#d29922">yellow</span> while starting, then <span style="color:#3fb950">green</span> when ready.</span></div>
+  <div class="step"><span class="step-num">6</span><span>Once green, click <strong>🌐 Chat</strong> to open the llama.cpp server's built-in chat interface.</span></div>
+  <div class="step"><span class="step-num">7</span><span>Click <strong style="color:#f85149">⏹ Stop</strong> to stop the model. Logs remain available for review.</span></div>
+
+  <h2><span class="emoji">✨</span>Features</h2>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="title">Multiple instances</div>
+      <div class="desc">Run several models at once, each with independent config.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">Constructor mode</div>
+      <div class="desc">Clickable UI for common flags: model, ctx-size, and more.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">Raw args mode</div>
+      <div class="desc">Full CLI string for arbitrary <code>llama-server</code> arguments.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">Env variables</div>
+      <div class="desc">Pass environment variables like <code>CUDA_VISIBLE_DEVICES</code>.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">Custom runtime</div>
+      <div class="desc">Per-card or global path to a specific <code>llama-server</code> binary.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">GPU monitoring</div>
+      <div class="desc">Live NVIDIA GPU stats: memory, temperature, power draw.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">Log streaming</div>
+      <div class="desc">Real-time stdout/stderr via SSE. Per-session history with collapsible blocks.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">Search &amp; sort</div>
+      <div class="desc">Filter cards by name, sort by last used or alphabetically.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">Expand view</div>
+      <div class="desc">Focus on one card with the <strong>⛶</strong> button — full-height logs area.</div>
+    </div>
+    <div class="feature-card">
+      <div class="title">Chat integration</div>
+      <div class="desc">One-click 🌐 button opens llama.cpp's web chat on the model's port.</div>
+    </div>
+  </div>
+
+  <h2><span class="emoji">🔧</span>Configuration</h2>
+  <p>All card configurations are saved to <code>config.json</code> in the application directory. The file uses a wrapper format:</p>
+  <p><code>{ "global_runtime": "/path/to/llama-server", "configs": [...] }</code></p>
+  <p>Runtime resolution priority: <strong>per-card → <code>--llama-bin</code> CLI flag → global config → <code>LLAMA_BIN</code> env → default <code>llama-server</code> in <code>$PATH</code></strong>.</p>
+
+  <a class="back-link" href="/" target="_self">← Back to 7L</a>
+</body>
+</html>

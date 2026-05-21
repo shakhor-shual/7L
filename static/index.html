@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>7L</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div class="global-menu">
+        <button class="global-menu-btn" id="settingsBtn" onclick="showSettingsDialog()" title="Application settings">⚙️</button>
+        <span class="global-menu-sep"></span>
+        <button class="global-menu-btn" id="addCardBtn" onclick="showAddCardDialog()" title="Add card">➕</button>
+        <button class="global-menu-btn" id="editCardBtn" onclick="showEditCardDialog()" disabled title="Edit card">✏️</button>
+        <button class="global-menu-btn" id="deleteCardBtn" onclick="deleteFocusedCard()" disabled title="Delete card">🗑️</button>
+      </div>
+    </div>
+    <div class="gpu-panel" id="gpuInfo"></div>
+    <div class="header-right">
+      <input class="search" id="searchInput" type="text" placeholder="🔍 Search models..." oninput="renderCards()">
+      <span style="color:#484f58;font-size:14px;line-height:1">⇅</span>
+      <div class="sort-group">
+        <button class="sort-btn active" data-sort="recent" onclick="setSortMode('recent')" title="Sort by last used">🕐</button>
+        <button class="sort-btn" data-sort="name" onclick="setSortMode('name')" title="Sort by name">Aa</button>
+      </div>
+      <button class="global-menu-btn" id="expandBtn" onclick="toggleExpand()" disabled title="Expand card">⛶</button>
+      <h1>7L</h1>
+    </div>
+  </div>
+
+  <div class="cards" id="cardsContainer">
+    <div class="empty-state"><h3>Loading...</h3></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="filedialog-overlay" id="fileDialog">
+    <div class="filedialog" style="width:620px">
+      <div class="filedialog-title">📁 <span id="fileDialogModelName">loading...</span></div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <input type="text" class="filedialog-input" id="fileDialogPath" style="flex:1;font-family:monospace" placeholder="/path/to/model.gguf" spellcheck="false" onchange="browseDir(this.value)">
+        <button class="btn btn-cancel" onclick="browseUp()" title="Up one level">⬆</button>
+        <button class="btn btn-cancel" onclick="browseNewFolder()" title="New folder">📁+</button>
+        <button class="btn btn-cancel" id="showHiddenBtn" onclick="toggleHidden()" title="Show hidden files">.</button>
+      </div>
+      <div class="browse-list" id="browseList" style="height:260px;overflow-y:auto;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:4px 0;font-size:13px"></div>
+      <div style="margin-top:8px;font-size:12px;color:#8b949e" id="browseInfo">Loading...</div>
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closeFileDialog()">✕ Cancel</button>
+        <button class="btn btn-danger" id="fileDialogResetBtn" onclick="resetRuntimeDialog()" style="display:none">↺ Reset</button>
+        <button class="btn btn-save" onclick="confirmFileDialog()">✓ Select</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="ctxDialog">
+    <div class="filedialog">
+      <div class="filedialog-title">🧠 Context size</div>
+      <div class="filedialog-hint">--ctx-size: number of tokens in context window</div>
+      <input type="number" class="filedialog-input" id="ctxDialogInput" min="128" max="131072" step="128">
+      <div class="ctx-chips" id="ctxDialogChips" style="margin-top:10px"></div>
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closeCtxDialog()">✕ Cancel</button>
+        <button class="btn btn-save" onclick="confirmCtxDialog()">✓ Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="paramDialog">
+    <div class="filedialog" style="width:480px">
+      <div class="filedialog-title"><span id="paramDialogFlag"></span></div>
+      <input type="text" class="filedialog-input" id="paramDialogInput" spellcheck="false">
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closeParamDialog()">✕ Cancel</button>
+        <button class="btn btn-save" onclick="confirmParamDialog()">✓ OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="addParamDialog">
+    <div class="filedialog" style="width:480px">
+      <div class="filedialog-title">+ Add parameter</div>
+      <input type="text" class="filedialog-input" id="addParamFilter" placeholder="🔍 filter..." spellcheck="false" oninput="renderAddParamOptions()" style="margin-bottom:4px">
+      <select id="addParamSelect" style="width:100%;padding:6px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-family:monospace;font-size:12px;margin-bottom:8px" size="10"></select>
+      <input type="text" class="filedialog-input" id="addParamValue" placeholder="value" spellcheck="false">
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closeAddParamDialog()">✕ Cancel</button>
+        <button class="btn btn-save" onclick="confirmAddParamDialog()">✓ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="renameDialog">
+    <div class="filedialog" style="width:460px">
+      <div class="filedialog-title">✏️ Edit card</div>
+      <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Name</label>
+      <input type="text" class="filedialog-input" id="renameDialogName" spellcheck="false" style="margin-bottom:12px">
+      <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Description</label>
+      <input type="text" class="filedialog-input" id="renameDialogDesc" spellcheck="false" placeholder="Optional description">
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closeRenameDialog()">✕ Cancel</button>
+        <button class="btn btn-save" onclick="confirmRenameDialog()">✓ Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="addCardDialog">
+    <div class="filedialog" style="width:540px">
+      <div class="filedialog-title">➕ New card</div>
+      <label class="fr-label" style="margin-top:0">Name</label>
+      <input type="text" class="filedialog-input" id="addCardDialogName" spellcheck="false" placeholder="Model nickname">
+      <label class="fr-label">Description <span style="color:#484f58">(optional)</span></label>
+      <input type="text" class="filedialog-input" id="addCardDialogDesc" spellcheck="false" placeholder="Brief description">
+      <div id="addCardPasteSection" style="margin:10px 0;padding:10px;background:#0d1117;border:1px solid #30363d;border-radius:6px">
+        <label class="fr-label" style="margin-top:0">Paste launch command</label>
+        <textarea class="filedialog-input" id="addCardPasteInput" spellcheck="false" style="min-height:50px;font-family:monospace;font-size:12px;margin-bottom:6px" placeholder="llama-server --model /path/to/model.gguf -c 4096 ..."></textarea>
+        <button class="btn btn-cancel" onclick="parsePasteCommand()" style="font-size:12px;padding:4px 10px">📋 Parse</button>
+        <span id="addCardParseStatus" style="font-size:11px;color:#8b949e;margin-left:8px"></span>
+      </div>
+      <label class="fr-label">Raw args</label>
+      <textarea class="filedialog-input" id="addCardDialogArgs" spellcheck="false" style="min-height:60px;font-family:monospace;font-size:12px"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <label class="fr-label" style="margin:0;white-space:nowrap">Runtime</label>
+        <input type="text" class="fr-input" id="addCardDialogRuntime" spellcheck="false" placeholder="/path/to/llama-server" style="flex:1">
+        <button class="btn btn-cancel" onclick="addCardBrowseRuntime()" style="white-space:nowrap;padding:4px 10px;font-size:12px">📁 Browse</button>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap;cursor:pointer">
+          <input type="checkbox" id="addCardUseSysRuntime" checked onchange="addCardToggleRuntime()"> Use system
+        </label>
+      </div>
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closeAddCardDialog()">✕ Cancel</button>
+        <button class="btn btn-save" onclick="confirmAddCardDialog()">✓ Create</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="settingsDialog">
+    <div class="filedialog" style="width:520px">
+      <div class="filedialog-title">⚙️ Application settings</div>
+      <div style="margin-top:12px">
+        <label class="fr-label">Global runtime</label>
+        <div class="fr-row">
+          <input type="text" class="fr-input" id="settingsRuntimeInput" spellcheck="false" placeholder="/path/to/llama-server">
+          <button class="btn btn-cancel" onclick="settingsBrowseRuntime()" style="white-space:nowrap;padding:4px 10px;font-size:12px">📁 Browse</button>
+          <button class="btn btn-danger" onclick="settingsClearRuntime()" style="white-space:nowrap;padding:4px 10px;font-size:12px" title="Clear runtime">✕</button>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label class="fr-label">HF cache folder</label>
+        <div class="fr-row">
+          <input type="text" class="fr-input" id="settingsCacheInput" spellcheck="false" placeholder="~/.cache/huggingface/hub">
+          <button class="btn btn-cancel" onclick="settingsBrowseCache()" style="white-space:nowrap;padding:4px 10px;font-size:12px">📁 Browse</button>
+          <button class="btn btn-danger" onclick="settingsClearCache()" style="white-space:nowrap;padding:4px 10px;font-size:12px" title="Clear cache path">✕</button>
+        </div>
+      </div>
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closeSettingsDialog()">✕ Cancel</button>
+        <button class="btn btn-save" onclick="confirmSettingsDialog()">✓ Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="promptDialog">
+    <div class="filedialog" style="width:400px">
+      <div class="filedialog-title" id="promptDialogTitle">Input</div>
+      <input type="text" class="filedialog-input" id="promptDialogInput" spellcheck="false" style="margin-top:6px" placeholder="Enter value">
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closePromptDialog()">✕ Cancel</button>
+        <button class="btn btn-save" onclick="confirmPromptDialog()">✓ OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="confirmDialog">
+    <div class="filedialog" style="width:400px">
+      <div class="filedialog-title" id="confirmDialogTitle">Confirm</div>
+      <p style="font-size:14px;color:#c9d1d9;margin:8px 0" id="confirmDialogMsg"></p>
+      <div class="filedialog-actions">
+        <button class="btn btn-cancel" onclick="closeConfirmDialog()">✕ Cancel</button>
+        <button class="btn btn-danger" onclick="confirmConfirmDialog()">✓ Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <a class="help-btn" href="help.html" target="_blank" title="Help">?</a>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>

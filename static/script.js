@@ -1120,6 +1120,58 @@ function parseFullCmd(text, name) {
   cfg.args_str = args;
 }
 
+function parsePastedCommand(text) {
+  let cleaned = text.replace(/^stdbuf\s+-oL\s+/m, '');
+
+  const lines = cleaned.split('\n');
+  const envLines = [];
+  const cmdParts = [];
+  let pending = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = (pending + lines[i]).trimEnd();
+    pending = '';
+
+    if (line.endsWith('\\')) {
+      pending = line.slice(0, -1).trimEnd() + ' ';
+      continue;
+    }
+
+    line = line.trim();
+    if (!line) continue;
+
+    const envMatch = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|(\S+))$/);
+    if (envMatch) {
+      const val = envMatch[2] !== undefined ? envMatch[2] : envMatch[3];
+      envLines.push(envMatch[1] + '=' + val);
+    } else {
+      cmdParts.push(line);
+    }
+  }
+
+  if (pending) {
+    const trimmed = pending.trim();
+    if (trimmed) cmdParts.push(trimmed);
+  }
+
+  const envStr = envLines.length > 0 ? envLines.join('\n') : undefined;
+
+  if (cmdParts.length === 0) return null;
+
+  const fullCmd = cmdParts.join(' ');
+  const tokens = fullCmd.match(/(?:"[^"]*"|'[^']*'|\S)+/g) || [];
+
+  let runtime;
+  let cmd = fullCmd;
+
+  if (tokens.length > 0 && !tokens[0].startsWith('-')) {
+    runtime = tokens[0];
+    cmd = tokens.slice(1).join(' ');
+  }
+
+  return { cmd, runtime, envStr };
+}
+
 function setMode(name, mode) {
   const state = cardState[name];
   if (!state) return;
@@ -1193,6 +1245,75 @@ function updateArgsSection(name) {
       ta.focus();
       ta.addEventListener('input', function() {
         rawInput[name] = this.value;
+        const st = cardState[name];
+        const dirty = rawInput[name] !== buildFullCmd(cfg);
+        const sb = document.getElementById('save-'+cssEscape(name));
+        if (sb) { sb.disabled = !dirty; sb.classList.toggle('dirty', dirty); }
+      });
+      ta.addEventListener('paste', function(e) {
+        const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+        if (!pastedText) return;
+        const hasNewlines = pastedText.includes('\n');
+        const hasContinuation = /\\\s*\n/.test(pastedText);
+        const hasEnvVars = /^(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=/.test(pastedText.trim());
+        if (!hasNewlines && !hasContinuation && !hasEnvVars) return;
+
+        const parsed = parsePastedCommand(pastedText);
+        if (!parsed) return;
+
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.substring(0, start) + parsed.cmd + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + parsed.cmd.length;
+
+        rawInput[name] = this.value;
+
+        if (parsed.envStr !== undefined) {
+          cfg.env_str = parsed.envStr;
+        }
+
+        if (parsed.runtime) {
+          const setRuntimePath = (path) => {
+            cfg.runtime = path;
+            delete runtimeExists[path];
+            const esced = cssEscape(name);
+            const rtBtn = document.getElementById('runtime-'+esced);
+            if (rtBtn) {
+              rtBtn.classList.add('custom');
+              const base = path.split('/').pop().split('\\').pop() || path;
+              rtBtn.title = path;
+              rtBtn.innerHTML = '<span class="llama-icon">🦙</span> ' + escHtml(base);
+            }
+          };
+          const useSystemRuntime = () => {
+            cfg.runtime = '';
+            delete runtimeExists[parsed.runtime];
+            const esced = cssEscape(name);
+            const rtBtn = document.getElementById('runtime-'+esced);
+            if (rtBtn) {
+              rtBtn.classList.remove('custom');
+              const sysPath = globalRuntimeCfg;
+              const base = sysPath ? sysPath.split('/').pop().split('\\').pop() || sysPath : 'select';
+              rtBtn.title = sysPath || 'Click to select runtime binary';
+              rtBtn.innerHTML = '<span class="llama-icon">🦙</span> ' + escHtml(base);
+            }
+          };
+          if (runtimeExists[parsed.runtime] !== undefined) {
+            if (runtimeExists[parsed.runtime]) setRuntimePath(parsed.runtime);
+            else useSystemRuntime();
+          } else {
+            fetch('/api/stat?path=' + encodeURIComponent(parsed.runtime))
+              .then(r => r.json())
+              .then(st => {
+                runtimeExists[parsed.runtime] = st.exists;
+                if (st.exists) setRuntimePath(parsed.runtime);
+                else useSystemRuntime();
+              })
+              .catch(() => useSystemRuntime());
+          }
+        }
+
         const st = cardState[name];
         const dirty = rawInput[name] !== buildFullCmd(cfg);
         const sb = document.getElementById('save-'+cssEscape(name));

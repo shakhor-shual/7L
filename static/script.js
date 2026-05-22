@@ -246,7 +246,7 @@ function showRuntimeDialog(name) {
   runtimeDialogTarget = name;
   const resetBtn = document.getElementById('fileDialogResetBtn');
   resetBtn.style.display = cfg.runtime ? '' : 'none';
-    fileDialogCallback = (path) => {
+    fileDialogCallback = async (path) => {
       cfg.runtime = path;
       delete runtimeExists[path];
       const esced = cssEscape(name);
@@ -259,8 +259,7 @@ function showRuntimeDialog(name) {
       }
       updateArgsSection(name);
       validateRuntimes();
-    const sb = document.getElementById('save-'+esced);
-    if (sb) { sb.disabled = false; sb.classList.add('dirty'); }
+      await saveCardConfig(name);
   };
   const path = cfg.runtime || '';
   document.getElementById('fileDialogPath').placeholder = '/path/to/llama-server';
@@ -288,8 +287,7 @@ function resetRuntimeDialog() {
   }
   updateArgsSection(name);
   validateRuntimes();
-  const sb = document.getElementById('save-'+esced);
-  if (sb) { sb.disabled = false; sb.classList.add('dirty'); }
+  saveCardConfig(name);
   showToast('Custom runtime reset — uses global default', 'ok');
   runtimeDialogTarget = null;
 }
@@ -742,7 +740,7 @@ function renderCards() {
                 ? `<button class="toolbar-btn stop" onclick="stopModel('${escJs(c.name)}')" title="${isReady ? '▶ Running' : '▶ Starting'} (pid: ${c.pid})">⏹</button>`
                 : `<button class="toolbar-btn run" onclick="runModel('${escJs(c.name)}')" title="Stopped">▶</button>`
               }
-              <button class="toolbar-btn web-btn${isRunning && isReady ? '' : ' hidden'}" onclick="window.open(location.protocol+'//'+location.hostname+':'+${c.port})" title="Open chat">🌐</button>
+              <button class="toolbar-btn web-btn${isRunning && isReady ? '' : ' hidden'}" onclick="window.open(location.protocol+'//'+location.hostname+':'+(${c.port}||8080))" title="Open chat">🌐</button>
             </div>
             <span class="card-title${isRunning ? (isReady ? ' running' : ' starting') : ''}">${escHtml(c.name)}</span>
             <div style="flex:1"></div>
@@ -750,7 +748,6 @@ function renderCards() {
               <button class="toolbar-btn${st.mode === 'constructor' ? ' active' : ''}" data-mode="constructor" onclick="setMode('${escJs(c.name)}','constructor')" title="Constructor mode">📐</button>
               <button class="toolbar-btn${st.mode === 'raw' ? ' active' : ''}" data-mode="raw" onclick="setMode('${escJs(c.name)}','raw')" title="Raw args">✏️</button>
               <button class="toolbar-btn${st.mode === 'env' ? ' active' : ''}" data-mode="env" onclick="setMode('${escJs(c.name)}','env')" title="Environment variables">💲</button>
-              <button class="toolbar-btn" id="save-${cssEscape(c.name)}" onclick="saveCardConfig('${escJs(c.name)}')" disabled title="Save to config.json">💾</button>
               <button class="toolbar-btn${activeLogs[c.name] ? ' active' : ''}" onclick="toggleLogs('${escJs(c.name)}')" id="logs-btn-${cssEscape(c.name)}" title="${activeLogs[c.name] ? 'Pause' : 'Show'} logs">${activeLogs[c.name] ? '⏸' : '📋'}</button>
             </div>
           </div>
@@ -1057,6 +1054,7 @@ async function confirmSettingsDialog() {
 async function runModel(name) {
   const cfg = configs.find(c => c.name === name);
   if (!cfg) return;
+  await saveCardConfig(name);
   const ctxSize = parseCtxFromArgs(cfg.args_str) || 2048;
   try {
     const r = await fetch('/api/run', { method:'POST', body: new URLSearchParams({name, ctx_size: ctxSize}) });
@@ -1074,6 +1072,7 @@ async function runModel(name) {
 }
 
 async function stopModel(name) {
+  await saveCardConfig(name);
   try {
     const r = await fetch('/api/stop', { method:'POST', body: new URLSearchParams({name}) });
     const d = await r.json();
@@ -1120,7 +1119,7 @@ function parseFullCmd(text, name) {
   cfg.args_str = args;
 }
 
-function parsePastedCommand(text) {
+function parsePastedCommand(text, hfCache) {
   let cleaned = text.replace(/^stdbuf\s+-oL\s+/m, '');
 
   const lines = cleaned.split('\n');
@@ -1154,7 +1153,18 @@ function parsePastedCommand(text) {
     if (trimmed) cmdParts.push(trimmed);
   }
 
-  const envStr = envLines.length > 0 ? envLines.join('\n') : undefined;
+  const processedEnvLines = envLines.map(ev => {
+    const m = ev.match(/^(LLAMA_CACHE)=(.+)$/);
+    if (m && m[2] && !m[2].startsWith('/')) {
+      const base = hfCache || '';
+      if (base) {
+        return 'LLAMA_CACHE=' + base.replace(/\/$/, '') + '/' + m[2];
+      }
+    }
+    return ev;
+  });
+
+  const envStr = processedEnvLines.length > 0 ? processedEnvLines.join('\n') : undefined;
 
   if (cmdParts.length === 0) return null;
 
@@ -1162,35 +1172,32 @@ function parsePastedCommand(text) {
   const tokens = fullCmd.match(/(?:"[^"]*"|'[^']*'|\S)+/g) || [];
 
   let runtime;
-  let cmd = fullCmd;
 
   if (tokens.length > 0 && !tokens[0].startsWith('-')) {
     runtime = tokens[0];
-    cmd = tokens.slice(1).join(' ');
   }
 
-  return { cmd, runtime, envStr };
+  return { cmd: fullCmd, runtime, envStr };
 }
 
-function setMode(name, mode) {
+async function setMode(name, mode) {
   const state = cardState[name];
   if (!state) return;
+  if (state.mode === mode) return;
   const cfg = configs.find(c => c.name === name);
   if (!cfg) return;
 
   if (state.mode === 'raw' && mode === 'constructor' && rawInput[name] !== undefined) {
-    // switching from raw to constructor: parse the raw input
     parseFullCmd(rawInput[name], name);
     delete rawInput[name];
   } else if (state.mode === 'constructor' && mode === 'raw') {
-    // switching from constructor to raw: build full command
     rawInput[name] = buildFullCmd(cfg);
   }
-  // also handle raw→raw re-entry
   if (mode === 'raw' && rawInput[name] === undefined) {
     rawInput[name] = buildFullCmd(cfg);
   }
 
+  await saveCardConfig(name);
   state.mode = mode;
   updateArgsSection(name);
 }
@@ -1208,17 +1215,6 @@ function updateArgsSection(name) {
     b.classList.toggle('active', b.dataset.mode === state.mode);
   });
 
-  const argsDirty = state.originalArgs !== cfg.args_str;
-  const envDirty = state.originalEnv !== (cfg.env_str || '');
-  const runtimeDirty = state.originalRuntime !== (cfg.runtime || '');
-  const hasChanges = argsDirty || envDirty || runtimeDirty;
-
-  const saveBtn = document.getElementById('save-'+cssEscape(name));
-  if (saveBtn) {
-    saveBtn.disabled = !hasChanges;
-    saveBtn.classList.toggle('dirty', hasChanges);
-  }
-
   const body = card.querySelector('.args-body');
   if (!body) return;
 
@@ -1231,10 +1227,6 @@ function updateArgsSection(name) {
       ta.focus();
       ta.addEventListener('input', function() {
         cfg.env_str = this.value;
-        const st = cardState[name];
-        const dirty = st.originalEnv !== cfg.env_str || st.originalRuntime !== (cfg.runtime || '');
-        const sb = document.getElementById('save-'+cssEscape(name));
-        if (sb) { sb.disabled = !dirty; sb.classList.toggle('dirty', dirty); }
       });
     }
   } else {
@@ -1245,10 +1237,6 @@ function updateArgsSection(name) {
       ta.focus();
       ta.addEventListener('input', function() {
         rawInput[name] = this.value;
-        const st = cardState[name];
-        const dirty = rawInput[name] !== buildFullCmd(cfg);
-        const sb = document.getElementById('save-'+cssEscape(name));
-        if (sb) { sb.disabled = !dirty; sb.classList.toggle('dirty', dirty); }
       });
       ta.addEventListener('paste', function(e) {
         const pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -1258,7 +1246,7 @@ function updateArgsSection(name) {
         const hasEnvVars = /^(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=/.test(pastedText.trim());
         if (!hasNewlines && !hasContinuation && !hasEnvVars) return;
 
-        const parsed = parsePastedCommand(pastedText);
+        const parsed = parsePastedCommand(pastedText, globalHfCache);
         if (!parsed) return;
 
         e.preventDefault();
@@ -1286,38 +1274,39 @@ function updateArgsSection(name) {
               rtBtn.innerHTML = '<span class="llama-icon">🦙</span> ' + escHtml(base);
             }
           };
-          const useSystemRuntime = () => {
+          const replaceWithSystemRt = () => {
+            const sysRt = globalRuntimeCfg;
             cfg.runtime = '';
             delete runtimeExists[parsed.runtime];
+            if (sysRt && this.value.startsWith(parsed.runtime)) {
+              this.value = sysRt + this.value.substring(parsed.runtime.length);
+              this.selectionStart = this.selectionEnd = this.value.length;
+              rawInput[name] = this.value;
+            }
             const esced = cssEscape(name);
             const rtBtn = document.getElementById('runtime-'+esced);
             if (rtBtn) {
               rtBtn.classList.remove('custom');
-              const sysPath = globalRuntimeCfg;
-              const base = sysPath ? sysPath.split('/').pop().split('\\').pop() || sysPath : 'select';
-              rtBtn.title = sysPath || 'Click to select runtime binary';
+              const base = sysRt ? sysRt.split('/').pop().split('\\').pop() || sysRt : 'select';
+              rtBtn.title = sysRt || 'Click to select runtime binary';
               rtBtn.innerHTML = '<span class="llama-icon">🦙</span> ' + escHtml(base);
             }
           };
           if (runtimeExists[parsed.runtime] !== undefined) {
             if (runtimeExists[parsed.runtime]) setRuntimePath(parsed.runtime);
-            else useSystemRuntime();
+            else replaceWithSystemRt();
           } else {
             fetch('/api/stat?path=' + encodeURIComponent(parsed.runtime))
               .then(r => r.json())
               .then(st => {
                 runtimeExists[parsed.runtime] = st.exists;
                 if (st.exists) setRuntimePath(parsed.runtime);
-                else useSystemRuntime();
+                else replaceWithSystemRt();
               })
-              .catch(() => useSystemRuntime());
+              .catch(() => replaceWithSystemRt());
           }
         }
 
-        const st = cardState[name];
-        const dirty = rawInput[name] !== buildFullCmd(cfg);
-        const sb = document.getElementById('save-'+cssEscape(name));
-        if (sb) { sb.disabled = !dirty; sb.classList.toggle('dirty', dirty); }
       });
     }
   }
@@ -1503,7 +1492,16 @@ function appendLog(name, line) {
 
 function clearLogs(name) {
   const content = document.getElementById(`logs-content-${cssEscape(name)}`);
-  if (content) content.innerHTML = '';
+  if (!content) return;
+  content.innerHTML = '';
+  if (esMap[name]) {
+    const session = document.createElement('div');
+    session.className = 'log-session active';
+    const bd = document.createElement('div');
+    bd.className = 'log-session-bd';
+    session.appendChild(bd);
+    content.appendChild(session);
+  }
 }
 
 function toggleLogs(name) {
@@ -1578,11 +1576,11 @@ function updateCardsStatus() {
       const pidLabel = '(pid: ' + c.pid + ')';
       toolbar.innerHTML =
         '<button class="toolbar-btn stop" onclick="stopModel(\''+escJs(c.name)+'\')" title="' + label + ' ' + pidLabel + '">⏹</button>' +
-        '<button class="toolbar-btn web-btn' + (c.ready ? '' : ' hidden') + '" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+c.port+')" title="Open chat">🌐</button>';
+        '<button class="toolbar-btn web-btn' + (c.ready ? '' : ' hidden') + '" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+(c.port||8080))" title="Open chat">🌐</button>';
     } else {
       toolbar.innerHTML =
         '<button class="toolbar-btn run" onclick="runModel(\''+escJs(c.name)+'\')" title="Stopped">▶</button>' +
-        '<button class="toolbar-btn web-btn hidden" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+c.port+')" title="Open chat">🌐</button>';
+        '<button class="toolbar-btn web-btn hidden" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+(c.port||8080))" title="Open chat">🌐</button>';
     }
   });
 }

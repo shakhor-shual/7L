@@ -46,6 +46,10 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; c
 .card.expanded .args-section { flex: 1; display: flex; flex-direction: column; }
 .card.expanded .args-body { flex: 1; }
 .card.expanded .args-body .args-display { min-height: 80px; }
+.card.expanded:has(.logs-area.active) .args-section { flex: 0 0 auto; }
+.card.expanded:has(.logs-area.active) .logs-area.active { flex: 1; display: flex; flex-direction: column; margin-top: 0; }
+.card.expanded:has(.logs-area.active) .logs-content { flex: 1; max-height: none; }
+.card.expanded:has(.logs-area.active) .log-session-bd { max-height: none; }
 .card.hidden { display: none; }
 .cards.expanded .card:not(.expanded):not(.hidden) { display: none; }
 .card input, .card textarea { cursor: auto; }

@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -21,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/creack/pty"
 )
 
 //go:embed static/*
@@ -56,11 +57,11 @@ type ConfigResponse struct {
 
 type process struct {
 	cmd       *exec.Cmd
-	stdout    io.ReadCloser
-	stderr    io.ReadCloser
+	ptyFile   *os.File
 	cfg       RuntimeConfig
 	startedAt time.Time
 	ready     chan struct{}
+	finished  chan struct{}
 }
 
 type RuntimeConfig struct {
@@ -489,9 +490,15 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Config not found", 404)
 		return
 	}
-	if _, loaded := procs.Load(name); loaded {
-		http.Error(w, "Already running", 409)
-		return
+	if val, loaded := procs.Load(name); loaded {
+		p := val.(*process)
+		select {
+		case <-p.finished:
+			procs.Delete(name)
+		default:
+			http.Error(w, "Already running", 409)
+			return
+		}
 	}
 
 	ctxSize := 2048
@@ -529,11 +536,9 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 	if llamaBin == "" {
 		llamaBin = findLlamaBinary()
 	}
-	log.Printf("🔍 Starting: stdbuf -oL %s %s", llamaBin, strings.Join(fullArgs, " "))
+	log.Printf("🔍 Starting: %s %s (PTY)", llamaBin, strings.Join(fullArgs, " "))
 
-	args := append([]string{"-oL", llamaBin}, fullArgs...)
-	cmd := exec.Command("stdbuf", args...)
-
+	cmd := exec.Command(llamaBin, fullArgs...)
 	cmd.Env = os.Environ()
 	if hasHfRepoFlag(fullArgs) {
 		hasHfCache := false
@@ -553,29 +558,19 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
 
-	stdoutPipe, err := cmd.StdoutPipe()
+	ptyFile, err := pty.Start(cmd)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error creating stdout pipe: %v", err), 500)
-		return
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error creating stderr pipe: %v", err), 500)
-		return
-	}
-
-	if err := cmd.Start(); err != nil {
-		http.Error(w, fmt.Sprintf("Error starting: %v", err), 500)
+		http.Error(w, fmt.Sprintf("Error starting process: %v", err), 500)
 		return
 	}
 
 	ready := make(chan struct{})
 	proc := &process{
 		cmd:       cmd,
-		stdout:    stdoutPipe,
-		stderr:    stderrPipe,
+		ptyFile:   ptyFile,
 		startedAt: time.Now(),
 		ready:     ready,
+		finished:  make(chan struct{}),
 		cfg: RuntimeConfig{
 			Config:  *cfg,
 			CtxSize: ctxSize,
@@ -617,14 +612,16 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(1 * time.Second)
 		if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
 			log.Printf("❌ Process %s crashed on start (code: %d)", name, cmd.ProcessState.ExitCode())
-			procs.Delete(name)
 		}
 	}()
 
 	go func() {
 		cmd.Wait()
-		procs.Delete(name)
 		log.Printf("🛑 Process %s finished (code: %d)", name, cmd.ProcessState.ExitCode())
+		close(proc.finished)
+		time.Sleep(5 * time.Second)
+		proc.ptyFile.Close()
+		procs.Delete(name)
 	}()
 
 	log.Printf("▶ Started %s (ctx=%d, pid=%d)", name, ctxSize, cmd.Process.Pid)
@@ -684,32 +681,83 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var wg sync.WaitGroup
 
-	streamPipe := func(pipe io.ReadCloser) {
+	streamPTY := func() {
 		defer wg.Done()
-		defer pipe.Close()
-		br := bufio.NewReader(pipe)
+		var partial bytes.Buffer
+		const (
+			stNormal = iota
+			stESC
+			stCSI
+			stOSC
+		)
+		escState := stNormal
+		buf := make([]byte, 4096)
 		for {
 			select {
 			case <-ctx.Done():
+				if partial.Len() > 0 {
+					fmt.Fprintf(w, "data: %s\n\n", partial.String())
+				}
 				return
 			default:
 			}
-			line, err := br.ReadString('\n')
-			text := strings.TrimRight(line, "\r\n")
-			if text != "" {
-				escaped := strings.ReplaceAll(text, "\n", "\\n")
-				fmt.Fprintf(w, "data: %s\n\n", escaped)
-				flusher.Flush()
+			n, err := proc.ptyFile.Read(buf)
+			if n > 0 {
+				for _, b := range buf[:n] {
+					if b == 0x1b {
+						escState = stESC
+						continue
+					}
+					switch escState {
+					case stESC:
+						if b == '[' {
+							escState = stCSI
+						} else if b == ']' {
+							escState = stOSC
+						} else {
+							escState = stNormal
+						}
+						continue
+					case stCSI:
+						if (b >= '0' && b <= '9') || b == ';' || b == '?' {
+							continue
+						}
+						escState = stNormal
+						if (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') {
+							continue
+						}
+						continue
+					case stOSC:
+						if b == 0x07 {
+							escState = stNormal
+						} else if b == 0x1b {
+							escState = stESC
+						}
+						continue
+					}
+					if b == '\n' || b == '\r' {
+						if partial.Len() > 0 {
+							fmt.Fprintf(w, "data: %s\n\n", partial.String())
+							flusher.Flush()
+						}
+						partial.Reset()
+					} else {
+						partial.WriteByte(b)
+					}
+				}
 			}
 			if err != nil {
+				if partial.Len() > 0 {
+					fmt.Fprintf(w, "data: %s\n\n", partial.String())
+					flusher.Flush()
+				}
 				return
 			}
 		}
 	}
 
-	wg.Add(2)
-	go streamPipe(proc.stdout)
-	go streamPipe(proc.stderr)
+	wg.Add(1)
+	go streamPTY()
 	wg.Wait()
 
 	fmt.Fprintf(w, "data: {\"type\":\"finished\",\"msg\":\"Process finished\"}\n\n")

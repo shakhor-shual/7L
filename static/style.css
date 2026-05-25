@@ -66,12 +66,10 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; c
 }
 
 /* ── Card footer ── */
-.card-footer { display: flex; align-items: center; justify-content: flex-end; padding: 4px 10px; background: #0d1117; border-bottom: 1px solid #21262d; }
-.card.expanded .card-footer { border-top: 1px solid #21262d; border-bottom: none; }
-.edit-btn { background: none; border: 1px solid transparent; color: #484f58; cursor: pointer; font-size: 13px; width: 26px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; line-height: 1; transition: all .15s; }
-.edit-btn:hover { color: #c9d1d9; border-color: #30363d; }
+.edit-btn { background: none; border: none; color: #484f58; cursor: pointer; font-size: 13px; width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; line-height: 1; transition: all .15s; flex-shrink: 0; }
+.edit-btn:hover { color: #c9d1d9; background: #21262d; }
 .edit-btn.confirm { color: #3fb950; }
-.edit-btn.confirm:hover { color: #56d364; border-color: #3fb950; }
+.edit-btn.confirm:hover { color: #56d364; }
 .edit-btn.disabled { opacity: .35; cursor: not-allowed; pointer-events: none; }
 
 /* ── Card edit fields ── */

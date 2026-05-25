@@ -691,10 +691,11 @@ function renderCards() {
               <button class="toolbar-btn web-btn${isRunning && isReady ? '' : ' hidden'}" onclick="window.open(location.protocol+'//'+location.hostname+':'+(${c.port}||8080))" title="Open chat">🌐</button>
             </div>
             <span class="card-title${isRunning ? (isReady ? ' running' : ' starting') : ''}" id="card-title-${cssEscape(c.name)}">${escHtml(c.name)}</span>
+            <button class="edit-btn${c.running ? ' disabled' : ''}" onclick="toggleEdit('${escJs(c.name)}')" id="edit-btn-${cssEscape(c.name)}" title="${c.running ? 'Cannot edit while running' : 'Edit card'}">✏️</button>
             <div style="flex:1"></div>
             <div class="toolbar-group">
               <button class="toolbar-btn${st.mode === 'constructor' ? ' active' : ''}" data-mode="constructor" onclick="setMode('${escJs(c.name)}','constructor')" title="Constructor mode">📐</button>
-              <button class="toolbar-btn${st.mode === 'raw' ? ' active' : ''}" data-mode="raw" onclick="setMode('${escJs(c.name)}','raw')" title="Raw args">✏️</button>
+              <button class="toolbar-btn${st.mode === 'raw' ? ' active' : ''}" data-mode="raw" onclick="setMode('${escJs(c.name)}','raw')" title="Raw args (command line)">&gt;_</button>
               <button class="toolbar-btn${st.mode === 'env' ? ' active' : ''}" data-mode="env" onclick="setMode('${escJs(c.name)}','env')" title="Environment variables">💲</button>
             </div>
           </div>
@@ -702,10 +703,6 @@ function renderCards() {
         <div class="args-body" id="args-body-${cssEscape(c.name)}">
           <div class="args-display" id="args-display-${cssEscape(c.name)}">${st.mode === 'constructor' ? renderArgsDisplay(c.name, c.args_str) : escHtml(st.mode === 'env' ? (c.env_str || '') : c.args_str)}</div>
         </div>
-      </div>
-
-      <div class="card-footer">
-        <button class="edit-btn${c.running ? ' disabled' : ''}" onclick="toggleEdit('${escJs(c.name)}')" id="edit-btn-${cssEscape(c.name)}" title="${c.running ? 'Cannot edit while running' : 'Edit card'}">✏️</button>
       </div>
 
       <div class="logs-area ${activeLogs[c.name] ? 'active' : ''}" id="logs-area-${cssEscape(c.name)}">

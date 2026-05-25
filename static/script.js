@@ -762,7 +762,6 @@ function renderCards() {
           <span>Process output</span>
           <div>
             <button class="scroll-btn ${logScrollPaused[c.name] ? 'paused' : ''}" id="scroll-btn-${cssEscape(c.name)}" onclick="toggleScrollPause('${escJs(c.name)}')">${logScrollPaused[c.name] ? '⏸ Auto-scroll' : '▶ Auto-scroll'}</button>
-            <button class="logs-clear" onclick="clearLogs('${escJs(c.name)}')" title="Clear logs">✕</button>
           </div>
         </div>
         <div class="logs-content" id="logs-content-${cssEscape(c.name)}"></div>
@@ -1449,6 +1448,7 @@ function connectSSE(name) {
         const msg = JSON.parse(e.data);
         if (msg.type === 'finished' || msg.type === 'error') {
           appendLog(name, '--- ' + msg.msg + ' ---');
+          endLogSession(name);
           es.close();
           delete esMap[name];
           return;

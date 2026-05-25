@@ -134,9 +134,6 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; c
 .logs-area.active { display: block; }
 .logs-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #0d1117; border-bottom: 1px solid #21262d; font-size: 12px; color: #8b949e; }
 .logs-content { max-height: 300px; overflow-y: auto; background: #0d1117; padding: 8px 12px; font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace; font-size: 12px; line-height: 1.5; color: #c9d1d9; white-space: pre-wrap; word-break: break-all; }
-.logs-clear { background: none; border: 1px solid transparent; color: #484f58; cursor: pointer; font-size: 11px; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 3px; padding: 0; line-height: 1; opacity: 0; transition: opacity .15s; vertical-align: middle; }
-.logs-header:hover .logs-clear { opacity: 1; }
-.logs-clear:hover { color: #f85149; border-color: #484f58; }
 .scroll-btn { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 12px; padding: 1px 4px; }
 .scroll-btn:hover { color: #c9d1d9; }
 .scroll-btn.paused { color: #d29922; }

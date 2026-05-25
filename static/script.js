@@ -1463,6 +1463,12 @@ function connectSSE(name) {
     if (es.readyState === EventSource.CLOSED) {
       appendLog(name, '--- Connection closed ---');
       delete esMap[name];
+      return;
+    }
+    const cfg = configs.find(c => c.name === name);
+    if (!cfg || !cfg.running) {
+      es.close();
+      delete esMap[name];
     }
   };
 }

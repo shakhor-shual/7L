@@ -650,6 +650,12 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	proc := val.(*process)
 	proc.cmd.Process.Kill()
 
+	select {
+	case <-proc.finished:
+	case <-time.After(3 * time.Second):
+		log.Printf("⚠️ Timeout waiting for %s to stop", name)
+	}
+
 	log.Printf("⏹ Stopped %s", name)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -665,6 +671,13 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	proc := val.(*process)
+
+	select {
+	case <-proc.finished:
+		http.Error(w, "Process already finished", 410)
+		return
+	default:
+	}
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {

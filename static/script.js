@@ -1221,22 +1221,34 @@ function updateArgsSection(name) {
   if (state.mode === 'constructor') {
     body.innerHTML = `<div class="args-display">${renderArgsDisplay(name, cfg.args_str)}</div>`;
   } else if (state.mode === 'env') {
-    body.innerHTML = `<textarea class="args-textarea" id="env-args-${cssEscape(name)}" spellcheck="false" placeholder="KEY=VALUE&#10;ANOTHER_KEY=value">${escHtml(cfg.env_str || '')}</textarea>`;
+    body.innerHTML = `<div class="args-textarea-wrap"><textarea class="args-textarea" id="env-args-${cssEscape(name)}" spellcheck="false" placeholder="KEY=VALUE&#10;ANOTHER_KEY=value">${escHtml(cfg.env_str || '')}</textarea><button class="args-clear" data-for="env-args-${cssEscape(name)}" title="Clear">✕</button></div>`;
     const ta = document.getElementById('env-args-'+cssEscape(name));
     if (ta) {
       ta.focus();
       ta.addEventListener('input', function() {
         cfg.env_str = this.value;
       });
+      const clearBtn = ta.parentElement.querySelector('.args-clear');
+      clearBtn.addEventListener('click', function() {
+        ta.value = '';
+        cfg.env_str = '';
+        ta.focus();
+      });
     }
   } else {
     const display = rawInput[name] !== undefined ? rawInput[name] : buildFullCmd(cfg);
-    body.innerHTML = `<textarea class="args-textarea" id="raw-args-${cssEscape(name)}" spellcheck="false">${escHtml(display)}</textarea>`;
+    body.innerHTML = `<div class="args-textarea-wrap"><textarea class="args-textarea" id="raw-args-${cssEscape(name)}" spellcheck="false">${escHtml(display)}</textarea><button class="args-clear" data-for="raw-args-${cssEscape(name)}" title="Clear">✕</button></div>`;
     const ta = document.getElementById('raw-args-'+cssEscape(name));
     if (ta) {
       ta.focus();
       ta.addEventListener('input', function() {
         rawInput[name] = this.value;
+      });
+      const clearBtn = ta.parentElement.querySelector('.args-clear');
+      clearBtn.addEventListener('click', function() {
+        ta.value = '';
+        rawInput[name] = '';
+        ta.focus();
       });
       ta.addEventListener('paste', function(e) {
         const pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -1576,11 +1588,11 @@ function updateCardsStatus() {
       const pidLabel = '(pid: ' + c.pid + ')';
       toolbar.innerHTML =
         '<button class="toolbar-btn stop" onclick="stopModel(\''+escJs(c.name)+'\')" title="' + label + ' ' + pidLabel + '">⏹</button>' +
-        '<button class="toolbar-btn web-btn' + (c.ready ? '' : ' hidden') + '" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+(c.port||8080))" title="Open chat">🌐</button>';
+        '<button class="toolbar-btn web-btn' + (c.ready ? '' : ' hidden') + '" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+(c.port||8080)+')" title="Open chat">🌐</button>';
     } else {
       toolbar.innerHTML =
         '<button class="toolbar-btn run" onclick="runModel(\''+escJs(c.name)+'\')" title="Stopped">▶</button>' +
-        '<button class="toolbar-btn web-btn hidden" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+(c.port||8080))" title="Open chat">🌐</button>';
+        '<button class="toolbar-btn web-btn hidden" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+(c.port||8080)+')" title="Open chat">🌐</button>';
     }
   });
 }

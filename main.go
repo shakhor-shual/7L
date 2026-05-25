@@ -236,15 +236,19 @@ func getConfigs(w http.ResponseWriter, _ *http.Request) {
 		}
 		if val, ok := procs.Load(cfg.Name); ok {
 			p := val.(*process)
-			resp.Running = true
 			select {
-			case <-p.ready:
-				resp.Ready = true
+			case <-p.finished:
 			default:
+				resp.Running = true
+				select {
+				case <-p.ready:
+					resp.Ready = true
+				default:
+				}
+				resp.CtxSize = p.cfg.CtxSize
+				resp.Pid = p.cmd.Process.Pid
+				resp.Uptime = int(time.Since(p.startedAt).Seconds())
 			}
-			resp.CtxSize = p.cfg.CtxSize
-			resp.Pid = p.cmd.Process.Pid
-			resp.Uptime = int(time.Since(p.startedAt).Seconds())
 		}
 		result = append(result, resp)
 	}

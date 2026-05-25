@@ -740,6 +740,7 @@ function renderCards() {
                 ? `<button class="toolbar-btn stop" onclick="stopModel('${escJs(c.name)}')" title="${isReady ? '▶ Running' : '▶ Starting'} (pid: ${c.pid})">⏹</button>`
                 : `<button class="toolbar-btn run" onclick="runModel('${escJs(c.name)}')" title="Stopped">▶</button>`
               }
+              <button class="toolbar-btn${activeLogs[c.name] ? ' active' : ''}" onclick="toggleLogs('${escJs(c.name)}')" id="logs-btn-${cssEscape(c.name)}" title="${activeLogs[c.name] ? 'Pause' : 'Show'} logs">${activeLogs[c.name] ? '⏸' : '📋'}</button>
               <button class="toolbar-btn web-btn${isRunning && isReady ? '' : ' hidden'}" onclick="window.open(location.protocol+'//'+location.hostname+':'+(${c.port}||8080))" title="Open chat">🌐</button>
             </div>
             <span class="card-title${isRunning ? (isReady ? ' running' : ' starting') : ''}">${escHtml(c.name)}</span>
@@ -748,7 +749,6 @@ function renderCards() {
               <button class="toolbar-btn${st.mode === 'constructor' ? ' active' : ''}" data-mode="constructor" onclick="setMode('${escJs(c.name)}','constructor')" title="Constructor mode">📐</button>
               <button class="toolbar-btn${st.mode === 'raw' ? ' active' : ''}" data-mode="raw" onclick="setMode('${escJs(c.name)}','raw')" title="Raw args">✏️</button>
               <button class="toolbar-btn${st.mode === 'env' ? ' active' : ''}" data-mode="env" onclick="setMode('${escJs(c.name)}','env')" title="Environment variables">💲</button>
-              <button class="toolbar-btn${activeLogs[c.name] ? ' active' : ''}" onclick="toggleLogs('${escJs(c.name)}')" id="logs-btn-${cssEscape(c.name)}" title="${activeLogs[c.name] ? 'Pause' : 'Show'} logs">${activeLogs[c.name] ? '⏸' : '📋'}</button>
             </div>
           </div>
         </div>
@@ -1577,21 +1577,22 @@ function updateCardsStatus() {
       title.classList.toggle('starting', c.running && !c.ready);
     }
 
-    const webBtn = card.querySelector('.web-btn');
-    if (webBtn) webBtn.classList.toggle('hidden', !(c.running && c.ready));
-
     const toolbar = card.querySelector('.toolbar-group');
     if (!toolbar) return;
+
+    const logsBtnHtml = '<button class="toolbar-btn' + (activeLogs[c.name] ? ' active' : '') + '" onclick="toggleLogs(\''+escJs(c.name)+'\')" id="logs-btn-'+cssEscape(c.name)+'" title="' + (activeLogs[c.name] ? 'Pause' : 'Show') + ' logs">' + (activeLogs[c.name] ? '⏸' : '📋') + '</button>';
 
     if (c.running) {
       const label = c.ready ? '▶ Running' : '▶ Starting';
       const pidLabel = '(pid: ' + c.pid + ')';
       toolbar.innerHTML =
         '<button class="toolbar-btn stop" onclick="stopModel(\''+escJs(c.name)+'\')" title="' + label + ' ' + pidLabel + '">⏹</button>' +
+        logsBtnHtml +
         '<button class="toolbar-btn web-btn' + (c.ready ? '' : ' hidden') + '" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+(c.port||8080)+')" title="Open chat">🌐</button>';
     } else {
       toolbar.innerHTML =
         '<button class="toolbar-btn run" onclick="runModel(\''+escJs(c.name)+'\')" title="Stopped">▶</button>' +
+        logsBtnHtml +
         '<button class="toolbar-btn web-btn hidden" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+(c.port||8080)+')" title="Open chat">🌐</button>';
     }
   });

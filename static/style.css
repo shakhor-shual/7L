@@ -63,9 +63,29 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; c
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: wave-shimmer 3s linear infinite;
 }
+
+/* ── Card footer ── */
+.card-footer { display: flex; align-items: center; justify-content: flex-end; padding: 4px 10px; background: #0d1117; border-bottom: 1px solid #21262d; }
+.card.expanded .card-footer { border-top: 1px solid #21262d; border-bottom: none; }
+.edit-btn { background: none; border: 1px solid transparent; color: #484f58; cursor: pointer; font-size: 13px; width: 26px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; line-height: 1; transition: all .15s; }
+.edit-btn:hover { color: #c9d1d9; border-color: #30363d; }
+.edit-btn.confirm { color: #3fb950; }
+.edit-btn.confirm:hover { color: #56d364; border-color: #3fb950; }
+.edit-btn.disabled { opacity: .35; cursor: not-allowed; pointer-events: none; }
+
+/* ── Card edit fields ── */
+.card-edit-fields { display: flex; align-items: center; gap: 8px; margin: 0 12px; flex: 1; min-width: 0; }
+.card-name-input, .card-desc-input { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 14px; padding: 3px 8px; outline: none; font-family: inherit; }
+.card-name-input { width: auto; min-width: 120px; font-weight: 600; }
+.card-name-input:focus { border-color: #58a6ff; }
+.card-desc-input { flex: 1; min-width: 100px; font-size: 13px; color: #8b949e; }
+.card-desc-input:focus { border-color: #58a6ff; }
+.card-desc-input::placeholder { color: #484f58; }
+
+/* ── Disabled buttons ── */
+.toolbar-btn.disabled-btn { opacity: .35; cursor: not-allowed; pointer-events: none; }
+
 @keyframes wave-shimmer { 0% { background-position: 200% center; } 100% { background-position: -200% center; } }
 
 /* ── Fields ── */

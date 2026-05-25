@@ -35,7 +35,7 @@ async function loadConfigs() {
   try {
     configs = await fetch('/api/configs').then(r => r.json());
     configs.forEach(c => {
-      if (!cardState[c.name]) cardState[c.name] = { mode: 'constructor', originalArgs: c.args_str, originalEnv: c.env_str, originalRuntime: c.runtime };
+      if (!cardState[c.name]) cardState[c.name] = { mode: 'constructor', editing: false, originalArgs: c.args_str, originalEnv: c.env_str, originalRuntime: c.runtime };
       cardState[c.name].originalArgs = c.args_str;
       cardState[c.name].originalEnv = c.env_str;
       cardState[c.name].originalRuntime = c.runtime || '';
@@ -64,13 +64,19 @@ function focusCard(name) {
   updateGlobalExpandBtn();
 }
 
-function toggleExpand() {
-  const name = expandedCard || focusedCard;
+function toggleExpand(optName) {
+  const name = optName || expandedCard || focusedCard;
   if (!name) return;
   const container = document.getElementById('cardsContainer');
   if (!container) return;
 
   if (expandedCard === name) {
+    // Cancel editing when collapsing
+    const st = cardState[name];
+    if (st && st.editing) {
+      st.editing = false;
+      updateCardHeader(name);
+    }
     expandedCard = null;
     container.classList.remove('expanded');
     container.querySelectorAll('.card').forEach(el => el.classList.remove('expanded', 'hidden'));
@@ -259,7 +265,8 @@ function showRuntimeDialog(name) {
       }
       updateArgsSection(name);
       validateRuntimes();
-      await saveCardConfig(name);
+  if (cardState[name]?.editing) return;
+  await saveCardConfig(name);
   };
   const path = cfg.runtime || '';
   document.getElementById('fileDialogPath').placeholder = '/path/to/llama-server';
@@ -470,9 +477,7 @@ function closeCtxDialog() {
 
 function updateGlobalMenuBtns() {
   const hasFocus = !!focusedCard && configs.some(c => c.name === focusedCard);
-  const eb = document.getElementById('editCardBtn');
   const db = document.getElementById('deleteCardBtn');
-  if (eb) eb.disabled = !hasFocus;
   if (db) db.disabled = !hasFocus;
 }
 
@@ -596,64 +601,6 @@ async function confirmAddCardDialog() {
   }
 }
 
-function showEditCardDialog() {
-  const name = focusedCard;
-  if (!name) return;
-  const cfg = configs.find(c => c.name === name);
-  if (!cfg) return;
-  document.getElementById('renameDialogName').value = name;
-  document.getElementById('renameDialogDesc').value = cfg.description || '';
-  document.getElementById('renameDialog').classList.add('active');
-  setTimeout(() => document.getElementById('renameDialogName').focus().select(), 100);
-}
-
-function closeRenameDialog() {
-  document.getElementById('renameDialog').classList.remove('active');
-}
-
-async function confirmRenameDialog() {
-  const oldName = focusedCard;
-  if (!oldName) return;
-  const newName = document.getElementById('renameDialogName').value.trim();
-  const desc = document.getElementById('renameDialogDesc').value.trim();
-  if (!newName) return;
-  closeRenameDialog();
-  if (newName === oldName) {
-    // Only update description
-    const cfg = configs.find(c => c.name === oldName);
-    if (cfg && cfg.description !== desc) {
-      cfg.description = desc;
-      await saveCardConfig(oldName);
-    }
-    return;
-  }
-  try {
-    const r = await fetch('/api/card/rename', {
-      method: 'POST',
-      body: new URLSearchParams({name: oldName, new_name: newName})
-    });
-    if (!r.ok) {
-      const err = await r.text();
-      showToast('Error: ' + err, 'err');
-      return;
-    }
-    // Update description separately via config update
-    const cfg = configs.find(c => c.name === newName);
-    if (cfg && desc) {
-      cfg.description = desc;
-      await fetch('/api/config/update', {
-        method: 'POST',
-        body: new URLSearchParams({name: newName, args_str: cfg.args_str, env_str: cfg.env_str || '', runtime: cfg.runtime || '', description: desc})
-      });
-    }
-    await reloadAll();
-    focusCard(newName);
-    showToast('✏️ Card updated', 'ok');
-  } catch(e) {
-    showToast('Rename error', 'err');
-  }
-}
-
 async function deleteFocusedCard() {
   const name = focusedCard;
   if (!name) return;
@@ -681,7 +628,7 @@ async function deleteFocusedCard() {
 async function reloadAll() {
   configs = await fetch('/api/configs').then(r => r.json());
   configs.forEach(c => {
-    if (!cardState[c.name]) cardState[c.name] = { mode: 'constructor', originalArgs: c.args_str, originalEnv: c.env_str, originalRuntime: c.runtime };
+    if (!cardState[c.name]) cardState[c.name] = { mode: 'constructor', editing: false, originalArgs: c.args_str, originalEnv: c.env_str, originalRuntime: c.runtime };
     cardState[c.name].originalArgs = c.args_str;
     cardState[c.name].originalEnv = c.env_str;
     cardState[c.name].originalRuntime = c.runtime || '';
@@ -743,7 +690,7 @@ function renderCards() {
               <button class="toolbar-btn${activeLogs[c.name] ? ' active' : ''}" onclick="toggleLogs('${escJs(c.name)}')" id="logs-btn-${cssEscape(c.name)}" title="${activeLogs[c.name] ? 'Pause' : 'Show'} logs">${activeLogs[c.name] ? '⏸' : '📋'}</button>
               <button class="toolbar-btn web-btn${isRunning && isReady ? '' : ' hidden'}" onclick="window.open(location.protocol+'//'+location.hostname+':'+(${c.port}||8080))" title="Open chat">🌐</button>
             </div>
-            <span class="card-title${isRunning ? (isReady ? ' running' : ' starting') : ''}">${escHtml(c.name)}</span>
+            <span class="card-title${isRunning ? (isReady ? ' running' : ' starting') : ''}" id="card-title-${cssEscape(c.name)}">${escHtml(c.name)}</span>
             <div style="flex:1"></div>
             <div class="toolbar-group">
               <button class="toolbar-btn${st.mode === 'constructor' ? ' active' : ''}" data-mode="constructor" onclick="setMode('${escJs(c.name)}','constructor')" title="Constructor mode">📐</button>
@@ -755,6 +702,10 @@ function renderCards() {
         <div class="args-body" id="args-body-${cssEscape(c.name)}">
           <div class="args-display" id="args-display-${cssEscape(c.name)}">${st.mode === 'constructor' ? renderArgsDisplay(c.name, c.args_str) : escHtml(st.mode === 'env' ? (c.env_str || '') : c.args_str)}</div>
         </div>
+      </div>
+
+      <div class="card-footer">
+        <button class="edit-btn${c.running ? ' disabled' : ''}" onclick="toggleEdit('${escJs(c.name)}')" id="edit-btn-${cssEscape(c.name)}" title="${c.running ? 'Cannot edit while running' : 'Edit card'}">✏️</button>
       </div>
 
       <div class="logs-area ${activeLogs[c.name] ? 'active' : ''}" id="logs-area-${cssEscape(c.name)}">
@@ -777,7 +728,11 @@ function renderCards() {
     if (st && st.mode !== 'constructor') {
       updateArgsSection(c.name);
     }
+    if (st && st.editing) {
+      updateCardHeader(c.name);
+    }
   });
+  updateCardsStatus();
   validateRuntimes();
 }
 
@@ -1392,13 +1347,6 @@ document.getElementById('addParamSelect').addEventListener('dblclick', function(
   if (this.value) confirmAddParamDialog();
 });
 
-document.getElementById('renameDialog').addEventListener('click', function(e) {
-  if (e.target === this) closeRenameDialog();
-});
-document.getElementById('renameDialogName').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') { e.preventDefault(); confirmRenameDialog(); }
-  if (e.key === 'Escape') closeRenameDialog();
-});
 
 document.getElementById('addCardDialog').addEventListener('click', function(e) {
   if (e.target === this) closeAddCardDialog();
@@ -1535,6 +1483,119 @@ function toggleLogs(name) {
   }
 }
 
+function updateCardHeader(name) {
+  const cfg = configs.find(c => c.name === name);
+  if (!cfg) return;
+  const st = cardState[name];
+  if (!st) return;
+
+  const title = document.getElementById('card-title-'+cssEscape(name));
+  if (!title) return;
+
+  if (st.editing) {
+    title.outerHTML = `<div class="card-edit-fields" id="card-title-${cssEscape(name)}">
+      <input class="card-name-input" id="card-name-${cssEscape(name)}" value="${escHtml(cfg.name)}" spellcheck="false" placeholder="Model name">
+      <input class="card-desc-input" id="card-desc-${cssEscape(name)}" value="${escHtml(cfg.description || '')}" spellcheck="false" placeholder="Description">
+    </div>`;
+    setTimeout(() => document.getElementById('card-name-'+cssEscape(name))?.focus(), 50);
+  } else {
+    const container = document.getElementById('card-title-'+cssEscape(name));
+    if (container) {
+      container.outerHTML = `<span class="card-title" id="card-title-${cssEscape(name)}">${escHtml(cfg.name)}</span>`;
+    }
+  }
+}
+
+async function toggleEdit(name) {
+  const cfg = configs.find(c => c.name === name);
+  if (!cfg || cfg.running) return;
+
+  const st = cardState[name];
+  if (!st) return;
+
+  if (expandedCard !== name) {
+    focusCard(name);
+    toggleExpand(name);
+    st.editing = true;
+  } else if (st.editing) {
+    await confirmEdit(name);
+    return;
+  } else {
+    st.editing = true;
+  }
+
+  updateCardHeader(name);
+  const btn = document.getElementById('edit-btn-'+cssEscape(name));
+  if (btn) { btn.textContent = '✓'; btn.title = 'Save changes'; btn.classList.add('confirm'); }
+  const runBtn = document.getElementById('card-'+cssEscape(name))?.querySelector('.toolbar-btn.run, .toolbar-btn.stop');
+  if (runBtn) runBtn.disabled = true;
+}
+
+async function confirmEdit(name) {
+  const cfg = configs.find(c => c.name === name);
+  if (!cfg) return;
+  const st = cardState[name];
+  if (!st) return;
+
+  const nameInput = document.getElementById('card-name-'+cssEscape(name));
+  const descInput = document.getElementById('card-desc-'+cssEscape(name));
+  const newName = nameInput ? nameInput.value.trim() : cfg.name;
+  const desc = descInput ? descInput.value.trim() : '';
+
+  if (!newName) {
+    showToast('Name cannot be empty', 'err');
+    return;
+  }
+
+  st.editing = false;
+
+  if (newName !== cfg.name) {
+    try {
+      const r = await fetch('/api/card/rename', {
+        method: 'POST',
+        body: new URLSearchParams({name, new_name: newName})
+      });
+      if (!r.ok) {
+        const err = await r.text();
+        showToast('Error: ' + err, 'err');
+        st.editing = true;
+        updateCardHeader(name);
+        return;
+      }
+      if (desc) {
+        const newCfg = configs.find(c => c.name === newName);
+        if (newCfg) {
+          newCfg.description = desc;
+          await fetch('/api/config/update', {
+            method: 'POST',
+            body: new URLSearchParams({name: newName, args_str: newCfg.args_str, env_str: newCfg.env_str || '', runtime: newCfg.runtime || '', description: desc})
+          });
+        }
+      }
+      await reloadAll();
+      focusCard(newName);
+      showToast('✏️ Card updated', 'ok');
+      return;
+    } catch(e) {
+      showToast('Rename error', 'err');
+      st.editing = true;
+      updateCardHeader(name);
+      return;
+    }
+  }
+
+  if (cfg.description !== desc) {
+    cfg.description = desc;
+    await saveCardConfig(name);
+  }
+
+  updateCardHeader(name);
+  const btn = document.getElementById('edit-btn-'+cssEscape(name));
+  if (btn) { btn.textContent = '✏️'; btn.title = 'Edit card'; btn.classList.remove('confirm'); }
+  const runBtn = document.getElementById('card-'+cssEscape(name))?.querySelector('.toolbar-btn.run, .toolbar-btn.stop');
+  if (runBtn) runBtn.disabled = false;
+}
+
 function toggleScrollPause(name) {
   logScrollPaused[name] = !logScrollPaused[name];
   const btn = document.getElementById(`scroll-btn-${cssEscape(name)}`);
@@ -1587,19 +1648,37 @@ function updateCardsStatus() {
     if (!toolbar) return;
 
     const logsBtnHtml = '<button class="toolbar-btn' + (activeLogs[c.name] ? ' active' : '') + '" onclick="toggleLogs(\''+escJs(c.name)+'\')" id="logs-btn-'+cssEscape(c.name)+'" title="' + (activeLogs[c.name] ? 'Pause' : 'Show') + ' logs">' + (activeLogs[c.name] ? '⏸' : '📋') + '</button>';
+    const isEditing = cardState[c.name]?.editing;
 
     if (c.running) {
       const label = c.ready ? '▶ Running' : '▶ Starting';
       const pidLabel = '(pid: ' + c.pid + ')';
       toolbar.innerHTML =
-        '<button class="toolbar-btn stop" onclick="stopModel(\''+escJs(c.name)+'\')" title="' + label + ' ' + pidLabel + '">⏹</button>' +
+        '<button class="toolbar-btn stop' + (isEditing ? ' disabled-btn' : '') + '" onclick="stopModel(\''+escJs(c.name)+'\')" title="' + label + ' ' + pidLabel + '"' + (isEditing ? ' disabled' : '') + '>⏹</button>' +
         logsBtnHtml +
         '<button class="toolbar-btn web-btn' + (c.ready ? '' : ' hidden') + '" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+(c.port||8080)+')" title="Open chat">🌐</button>';
     } else {
       toolbar.innerHTML =
-        '<button class="toolbar-btn run" onclick="runModel(\''+escJs(c.name)+'\')" title="Stopped">▶</button>' +
+        '<button class="toolbar-btn run' + (isEditing ? ' disabled-btn' : '') + '" onclick="runModel(\''+escJs(c.name)+'\')" title="' + (isEditing ? 'Editing — save first' : 'Stopped') + '"' + (isEditing ? ' disabled' : '') + '>▶</button>' +
         logsBtnHtml +
         '<button class="toolbar-btn web-btn hidden" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+(c.port||8080)+')" title="Open chat">🌐</button>';
+    }
+
+    const editBtn = document.getElementById('edit-btn-'+cssEscape(c.name));
+    if (editBtn) {
+      if (c.running) {
+        editBtn.classList.add('disabled');
+        editBtn.title = 'Cannot edit while running';
+      } else if (cardState[c.name]?.editing) {
+        editBtn.textContent = '✓';
+        editBtn.title = 'Save changes';
+        editBtn.classList.add('confirm');
+        editBtn.classList.remove('disabled');
+      } else {
+        editBtn.textContent = '✏️';
+        editBtn.title = 'Edit card';
+        editBtn.classList.remove('confirm', 'disabled');
+      }
     }
   });
 }

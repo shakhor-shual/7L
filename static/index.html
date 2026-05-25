@@ -13,7 +13,6 @@
         <button class="global-menu-btn" id="settingsBtn" onclick="showSettingsDialog()" title="Application settings">⚙️</button>
         <span class="global-menu-sep"></span>
         <button class="global-menu-btn" id="addCardBtn" onclick="showAddCardDialog()" title="Add card">➕</button>
-        <button class="global-menu-btn" id="editCardBtn" onclick="showEditCardDialog()" disabled title="Edit card">✏️</button>
         <button class="global-menu-btn" id="deleteCardBtn" onclick="deleteFocusedCard()" disabled title="Delete card">🗑️</button>
       </div>
     </div>
@@ -88,20 +87,6 @@
       <div class="filedialog-actions">
         <button class="btn btn-cancel" onclick="closeAddParamDialog()">✕ Cancel</button>
         <button class="btn btn-save" onclick="confirmAddParamDialog()">✓ Add</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="filedialog-overlay" id="renameDialog">
-    <div class="filedialog" style="width:460px">
-      <div class="filedialog-title">✏️ Edit card</div>
-      <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Name</label>
-      <input type="text" class="filedialog-input" id="renameDialogName" spellcheck="false" style="margin-bottom:12px">
-      <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px">Description</label>
-      <input type="text" class="filedialog-input" id="renameDialogDesc" spellcheck="false" placeholder="Optional description">
-      <div class="filedialog-actions">
-        <button class="btn btn-cancel" onclick="closeRenameDialog()">✕ Cancel</button>
-        <button class="btn btn-save" onclick="confirmRenameDialog()">✓ Save</button>
       </div>
     </div>
   </div>

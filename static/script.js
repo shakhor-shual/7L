@@ -2112,9 +2112,25 @@ async function quitApp() {
     }
     await Promise.all(running.map(c => stopModelForShutdown(c.name)));
   }
-  showToast('🛑 Shutting down...', 'ok');
   closeAboutDialog();
-  await fetch('/api/shutdown', { method:'POST' });
+  try { await fetch('/api/shutdown', { method:'POST' }); } catch(e) {}
+
+  const msg = document.createElement('div');
+  msg.id = 'shutdownMsg';
+  msg.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;padding:40px">
+      <div style="font-size:48px">⏻</div>
+      <div style="font-size:20px;font-weight:600;color:#c9d1d9">7L server stopped</div>
+      <div style="font-size:14px;color:#8b949e">Models unloaded from memory</div>
+      <div style="font-size:12px;color:#484f58;margin-top:12px">You may close this tab</div>
+    </div>
+  `;
+  Object.assign(msg.style, {
+    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+    background: '#0d1117', zIndex: 9999
+  });
+  document.body.appendChild(msg);
+  setTimeout(() => { try { window.close(); } catch(e) {} }, 2000);
 }
 
 document.getElementById('aboutDialog').addEventListener('click', function(e) {

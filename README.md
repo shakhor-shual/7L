@@ -2,6 +2,8 @@
 
 7L is a lightweight web UI for running and managing multiple **llama.cpp** server instances side by side. Each model runs as a separate process with its own arguments, environment variables, and runtime binary.
 
+![7L screenshot](7L.png)
+
 ## Quick Start
 
 ### Download a release

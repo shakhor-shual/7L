@@ -2097,21 +2097,8 @@ async function stopModelForShutdown(name) {
 }
 
 async function quitApp() {
-  const unload = document.getElementById('unloadCheckbox').checked;
   const running = configs.filter(c => c.running);
-  if (running.length > 0) {
-    if (unload) {
-      for (const c of running) {
-        if (c.ready && c.port) {
-          try {
-            await fetch(`http://localhost:${c.port}/api/unload`, { method:'POST' });
-          } catch(e) {}
-        }
-      }
-      await new Promise(r => setTimeout(r, 1000));
-    }
-    await Promise.all(running.map(c => stopModelForShutdown(c.name)));
-  }
+  await Promise.all(running.map(c => stopModelForShutdown(c.name)));
   closeAboutDialog();
   try { await fetch('/api/shutdown', { method:'POST' }); } catch(e) {}
 

@@ -26,7 +26,7 @@
         </div>
       </div>
       <button class="global-menu-btn" id="settingsBtn" onclick="showSettingsDialog()" title="Application settings">⚙️</button>
-      <h1>7L</h1>
+      <h1 id="appTitle" onclick="showAboutDialog()" title="About 7L">7L</h1>
     </div>
   </div>
 
@@ -166,6 +166,30 @@
       <div class="filedialog-actions">
         <button class="btn btn-cancel" onclick="closeConfirmDialog()">✕ Cancel</button>
         <button class="btn btn-danger" onclick="confirmConfirmDialog()">✓ Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filedialog-overlay" id="aboutDialog">
+    <div class="filedialog" style="width:400px">
+      <div class="filedialog-title">ℹ️ About 7L</div>
+      <div style="margin:12px 0;font-size:14px;color:#c9d1d9;line-height:1.6">
+        <p style="margin-bottom:8px"><strong>7L</strong> — llama.cpp Model Manager</p>
+        <p style="font-size:13px;color:#8b949e;margin-bottom:12px">
+          Lightweight web UI for running and managing multiple llama.cpp server instances.
+        </p>
+        <div style="font-size:12px;color:#8b949e">
+          <p>Version: <span id="appVersion">loading...</span></p>
+        </div>
+      </div>
+      <div style="border-top:1px solid #21262d;padding-top:14px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#c9d1d9;cursor:pointer;margin-bottom:12px">
+          <input type="checkbox" id="unloadCheckbox"> Unload models from GPU before stopping
+        </label>
+        <div class="filedialog-actions" style="margin-top:0">
+          <button class="btn btn-danger" onclick="quitApp()">⏻ Quit</button>
+          <button class="btn btn-cancel" onclick="closeAboutDialog()">✕ Close</button>
+        </div>
       </div>
     </div>
   </div>

@@ -6,8 +6,10 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; c
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 16px; }
 .header-left { display: flex; align-items: center; gap: 10px; }
 .header-right { display: flex; align-items: center; gap: 10px; }
-.header h1 { font-family: 'DSEG7', monospace; font-size: 22px; font-weight: 700; color: #484f58; letter-spacing: 2px; transition: color .3s, text-shadow .3s; }
+.header h1 { font-family: 'DSEG7', monospace; font-size: 22px; font-weight: 700; color: #484f58; letter-spacing: 2px; transition: color .3s, text-shadow .3s; cursor: pointer; }
+.header h1:hover { color: #8b949e; }
 .header h1.running { color: #58a6ff; text-shadow: 0 0 8px #58a6ff44, 0 0 20px #58a6ff22; animation: pulse-glow 2s ease-in-out infinite; }
+.header h1.running:hover { color: #79c0ff; }
 @keyframes pulse-glow { 0%,100% { text-shadow: 0 0 8px #58a6ff44, 0 0 20px #58a6ff22; } 50% { text-shadow: 0 0 12px #58a6ff66, 0 0 30px #58a6ff33; } }
 
 /* ── GPU ── */

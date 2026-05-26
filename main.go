@@ -134,6 +134,7 @@ func main() {
 	mux.HandleFunc("/api/first-run", handleFirstRun)
 	mux.HandleFunc("/api/first-run/setup", handleFirstRunSetup)
 	mux.HandleFunc("/api/first-run/smart-scan", handleSmartScan)
+	mux.HandleFunc("/api/shutdown", handleShutdown)
 
 	addr := fmt.Sprintf("%s:%d", flagHost, flagPort)
 	llamaBin := findLlamaBinary()
@@ -666,6 +667,30 @@ func handleStop(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	fmt.Fprintf(w, `{"status":"ok","msg":"Stopped"}`)
+}
+
+func handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+	procs.Range(func(key, value any) bool {
+		proc := value.(*process)
+		proc.cmd.Process.Kill()
+		select {
+		case <-proc.finished:
+		case <-time.After(2 * time.Second):
+		}
+		return true
+	})
+	saveConfigs()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		log.Printf("🛑 Shutdown requested")
+		os.Exit(0)
+	}()
 }
 
 func handleLogs(w http.ResponseWriter, r *http.Request) {

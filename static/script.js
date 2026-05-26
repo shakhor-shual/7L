@@ -2073,6 +2073,54 @@ async function wizParseAndOpen() {
   }
 }
 
+/* ── About dialog ── */
+
+const APP_VERSION = 'v0.1.0';
+
+function showAboutDialog() {
+  document.getElementById('appVersion').textContent = APP_VERSION;
+  document.getElementById('aboutDialog').classList.add('active');
+}
+
+function closeAboutDialog() {
+  document.getElementById('aboutDialog').classList.remove('active');
+}
+
+async function stopModelForShutdown(name) {
+  try {
+    const r = await fetch('/api/stop', { method:'POST', body: new URLSearchParams({name}) });
+    if (r.ok) {
+      if (esMap[name]) { esMap[name].close(); delete esMap[name]; }
+      endLogSession(name);
+    }
+  } catch(e) {}
+}
+
+async function quitApp() {
+  const unload = document.getElementById('unloadCheckbox').checked;
+  const running = configs.filter(c => c.running);
+  if (running.length > 0) {
+    if (unload) {
+      for (const c of running) {
+        if (c.ready && c.port) {
+          try {
+            await fetch(`http://localhost:${c.port}/api/unload`, { method:'POST' });
+          } catch(e) {}
+        }
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    await Promise.all(running.map(c => stopModelForShutdown(c.name)));
+  }
+  showToast('🛑 Shutting down...', 'ok');
+  closeAboutDialog();
+  await fetch('/api/shutdown', { method:'POST' });
+}
+
+document.getElementById('aboutDialog').addEventListener('click', function(e) {
+  if (e.target === this) closeAboutDialog();
+});
+
 fetch('/api/first-run')
   .then(r => r.json())
   .then(data => {

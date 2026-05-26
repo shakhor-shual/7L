@@ -45,8 +45,8 @@ async function loadConfigs() {
     console.error('loadConfigs error:', e);
   }
   renderCards();
-  if (configs.length && !focusedCard) {
-    focusCard(configs[0].name);
+  if (configs.length) {
+    focusCard(focusedCard || configs[0].name);
   }
 }
 
@@ -64,18 +64,23 @@ function focusCard(name) {
   updateGlobalExpandBtn();
 }
 
-function toggleExpand(optName) {
+function toggleExpand(optName, enterEdit) {
   const name = optName || expandedCard || focusedCard;
   if (!name) return;
   const container = document.getElementById('cardsContainer');
   if (!container) return;
 
   if (expandedCard === name) {
-    // Cancel editing when collapsing
     const st = cardState[name];
     if (st && st.editing) {
+      if (st.isNew) {
+        cancelEdit(name);
+        return;
+      }
       st.editing = false;
       updateCardHeader(name);
+      const runBtn = document.getElementById('card-'+cssEscape(name))?.querySelector('.toolbar-btn.run, .toolbar-btn.stop');
+      if (runBtn) runBtn.disabled = false;
     }
     expandedCard = null;
     container.classList.remove('expanded');
@@ -92,6 +97,15 @@ function toggleExpand(optName) {
         el.classList.remove('expanded');
       }
     });
+    if (enterEdit) {
+      const st = cardState[name];
+      if (st) {
+        st.editing = true;
+        updateCardHeader(name);
+        const runBtn = document.getElementById('card-'+cssEscape(name))?.querySelector('.toolbar-btn.run, .toolbar-btn.stop');
+        if (runBtn) runBtn.disabled = true;
+      }
+    }
   }
   updateSortDisabled();
   updateGlobalExpandBtn();
@@ -307,7 +321,7 @@ function closeFileDialog() {
   browseDirOnly = false;
   if (browseFromSettings) {
     browseFromSettings = false;
-    showSettingsDialog();
+    document.getElementById('settingsDialog').classList.add('active');
   }
 }
 
@@ -484,15 +498,25 @@ function updateGlobalMenuBtns() {
 function updateGlobalExpandBtn() {
   const btn = document.getElementById('expandBtn');
   if (!btn) return;
-  const canExpand = expandedCard || (focusedCard && configs.some(c => c.name === focusedCard));
-  btn.disabled = !canExpand;
-  if (expandedCard) {
-    btn.textContent = '✕';
-    btn.title = 'Collapse';
-  } else {
-    btn.textContent = '⛶';
-    btn.title = 'Expand card';
+  const container = document.getElementById('cardsContainer');
+
+  // Sync expandedCard to DOM state
+  {
+    const domExpanded = container?.classList.contains('expanded');
+    if (expandedCard && !domExpanded) expandedCard = null;
+    if (domExpanded) {
+      const ec = container.querySelector('.card.expanded');
+      if (!ec) {
+        container.classList.remove('expanded');
+        expandedCard = null;
+      } else if (!expandedCard) {
+        expandedCard = ec.id.replace(/^card-/, '');
+      }
+    }
   }
+
+  const nowExpanded = container?.classList.contains('expanded');
+  btn.disabled = !(nowExpanded || (focusedCard && configs.some(c => c.name === focusedCard)));
 }
 
 function showAddCardDialog(name, args, runtime, desc) {
@@ -515,6 +539,52 @@ function showAddCardDialog(name, args, runtime, desc) {
 
 function closeAddCardDialog() {
   document.getElementById('addCardDialog').classList.remove('active');
+}
+
+async function cloneCard(sourceName) {
+  const src = configs.find(c => c.name === sourceName);
+  if (!src) return;
+  let name = src.name;
+  let i = 1;
+  while (configs.some(c => c.name === name)) name = src.name + ' (' + i++ + ')';
+  const desc = src.description || '';
+  const args = src.args_str || '';
+
+  const tempCard = {
+    name, description: desc, args_str: args, env_str: src.env_str || '', runtime: src.runtime || '',
+    running: false, ready: false, pid: 0, port: 0, ctx_size: src.ctx_size || 2048, default_ctx: src.default_ctx || 2048
+  };
+  configs.push(tempCard);
+  cardState[name] = {
+    mode: 'raw', editing: true, isNew: true,
+    originalArgs: args, originalEnv: src.env_str || '', originalRuntime: src.runtime || ''
+  };
+
+  renderCards();
+  focusCard(name);
+  toggleExpand(name, true);
+}
+
+async function addQuickCard() {
+  let name = 'New Config';
+  let i = 1;
+  while (configs.some(c => c.name === name)) name = 'New Config (' + i++ + ')';
+  const desc = 'This config description';
+  const args = '--model /path/to/model.gguf --ctx-size 2048 -ngl 999';
+
+  const tempCard = {
+    name, description: desc, args_str: args, env_str: '', runtime: '',
+    running: false, ready: false, pid: 0, port: 0, ctx_size: 2048, default_ctx: 2048
+  };
+  configs.push(tempCard);
+  cardState[name] = {
+    mode: 'raw', editing: true, isNew: true,
+    originalArgs: args, originalEnv: '', originalRuntime: ''
+  };
+
+  renderCards();
+  focusCard(name);
+  toggleExpand(name, true);
 }
 
 async function parsePasteCommand() {
@@ -627,6 +697,7 @@ async function deleteFocusedCard() {
 
 async function reloadAll() {
   configs = await fetch('/api/configs').then(r => r.json());
+  if (expandedCard && !configs.some(c => c.name === expandedCard)) expandedCard = null;
   configs.forEach(c => {
     if (!cardState[c.name]) cardState[c.name] = { mode: 'constructor', editing: false, originalArgs: c.args_str, originalEnv: c.env_str, originalRuntime: c.runtime };
     cardState[c.name].originalArgs = c.args_str;
@@ -691,7 +762,16 @@ function renderCards() {
               <button class="toolbar-btn web-btn${isRunning && isReady ? '' : ' hidden'}" onclick="window.open(location.protocol+'//'+location.hostname+':'+(${c.port}||8080))" title="Open chat">🌐</button>
             </div>
             <span class="card-title${isRunning ? (isReady ? ' running' : ' starting') : ''}" id="card-title-${cssEscape(c.name)}">${escHtml(c.name)}</span>
-            <button class="edit-btn${c.running ? ' disabled' : ''}" onclick="toggleEdit('${escJs(c.name)}')" id="edit-btn-${cssEscape(c.name)}" title="${c.running ? 'Cannot edit while running' : 'Edit card'}">✏️</button>
+            <button class="edit-btn" onclick="toggleEdit('${escJs(c.name)}')" id="edit-btn-${cssEscape(c.name)}" title="Edit card">✏️</button>
+            <button class="edit-btn clone-btn" onclick="cloneCard('${escJs(c.name)}')" id="clone-btn-${cssEscape(c.name)}" title="Clone card">👥</button>
+            <div class="card-edit-fields" id="card-fields-${cssEscape(c.name)}" style="display:none">
+              <div class="card-edit-row">
+                <input class="card-name-input" id="card-name-${cssEscape(c.name)}" value="${escHtml(c.name)}" spellcheck="false" placeholder="Model name">
+                <button class="edit-btn edit-save" onclick="confirmEdit('${escJs(c.name)}')" id="edit-save-${cssEscape(c.name)}" title="Save changes">💾 Save</button>
+                <button class="edit-btn edit-cancel" onclick="cancelEdit('${escJs(c.name)}')" id="edit-cancel-${cssEscape(c.name)}" title="Cancel editing">✕ Cancel</button>
+              </div>
+              <textarea class="card-desc-input" id="card-desc-${cssEscape(c.name)}" spellcheck="false" placeholder="Description" rows="2">${escHtml(c.description || '')}</textarea>
+            </div>
             <div style="flex:1"></div>
             <div class="toolbar-group">
               <button class="toolbar-btn${st.mode === 'constructor' ? ' active' : ''}" data-mode="constructor" onclick="setMode('${escJs(c.name)}','constructor')" title="Constructor mode">📐</button>
@@ -718,6 +798,8 @@ function renderCards() {
   }).join('');
 
   configs.forEach(c => {
+    const titleEl = document.getElementById('card-title-'+cssEscape(c.name));
+    if (titleEl && c.description) titleEl.title = c.description;
     if (activeLogs[c.name] && c.running) {
       connectSSE(c.name);
     }
@@ -906,8 +988,16 @@ async function loadGlobalConfig() {
     const data = await fetch('/api/global-config').then(r => r.json());
     globalRuntimeCfg = data.global_runtime || '';
     globalHfCache = data.hf_cache || '';
+    configs.forEach(c => {
+      if (c.runtime && c.runtime === globalRuntimeCfg) c.runtime = '';
+    });
     updateGlobalRuntimeBtn();
     renderCards();
+    if (focusedCard) {
+      focusCard(focusedCard);
+    } else if (configs.length) {
+      focusCard(configs[0].name);
+    }
   } catch(e) {
     console.error('loadGlobalConfig error:', e);
   }
@@ -989,9 +1079,13 @@ async function confirmSettingsDialog() {
       body: params
     });
     if (r.ok) {
+      const runtimeChanged = runtime !== globalRuntimeCfg;
       globalRuntimeCfg = runtime;
       globalHfCache = cache;
       updateGlobalRuntimeBtn();
+      if (runtimeChanged) {
+        renderCards();
+      }
       showToast('✅ Settings saved', 'ok');
       closeSettingsDialog();
     } else {
@@ -1280,6 +1374,7 @@ async function saveCardConfig(name) {
   const cfg = configs.find(c => c.name === name);
   if (!cfg) return;
   const state = cardState[name];
+  if (state?.isNew) return;
   // if in raw mode and we have unparsed input, parse it now
   if (state && state.mode === 'raw' && rawInput[name] !== undefined) {
     parseFullCmd(rawInput[name], name);
@@ -1288,7 +1383,7 @@ async function saveCardConfig(name) {
   try {
     const r = await fetch('/api/config/update', {
       method:'POST',
-      body: new URLSearchParams({name, args_str: cfg.args_str, env_str: cfg.env_str || '', runtime: cfg.runtime || ''})
+      body: new URLSearchParams({name, args_str: cfg.args_str, env_str: cfg.env_str || '', runtime: cfg.runtime || '', description: cfg.description || ''})
     });
     if (!r.ok) {
       const errText = await r.text();
@@ -1298,6 +1393,11 @@ async function saveCardConfig(name) {
     cardState[name].originalArgs = cfg.args_str;
     cardState[name].originalEnv = cfg.env_str || '';
     cardState[name].originalRuntime = cfg.runtime || '';
+    const titleEl = document.getElementById('card-title-'+cssEscape(name));
+    if (titleEl) {
+      if (cfg.description) titleEl.title = cfg.description;
+      else titleEl.removeAttribute('title');
+    }
     updateArgsSection(name);
     showToast('💾 Saved to config.json', 'ok');
   } catch(e) {
@@ -1487,45 +1587,47 @@ function updateCardHeader(name) {
   if (!st) return;
 
   const title = document.getElementById('card-title-'+cssEscape(name));
-  if (!title) return;
+  const fields = document.getElementById('card-fields-'+cssEscape(name));
+  if (!title || !fields) return;
 
   if (st.editing) {
-    title.outerHTML = `<div class="card-edit-fields" id="card-title-${cssEscape(name)}">
-      <input class="card-name-input" id="card-name-${cssEscape(name)}" value="${escHtml(cfg.name)}" spellcheck="false" placeholder="Model name">
-      <input class="card-desc-input" id="card-desc-${cssEscape(name)}" value="${escHtml(cfg.description || '')}" spellcheck="false" placeholder="Description">
-    </div>`;
-    setTimeout(() => document.getElementById('card-name-'+cssEscape(name))?.focus(), 50);
+    title.style.display = 'none';
+    fields.style.display = 'flex';
+    const ni = document.getElementById('card-name-'+cssEscape(name));
+    if (ni) { ni.value = cfg.name; }
+    const di = document.getElementById('card-desc-'+cssEscape(name));
+    if (di) { di.value = cfg.description || ''; }
+    setTimeout(() => ni?.focus(), 50);
   } else {
-    const container = document.getElementById('card-title-'+cssEscape(name));
-    if (container) {
-      container.outerHTML = `<span class="card-title" id="card-title-${cssEscape(name)}">${escHtml(cfg.name)}</span>`;
-    }
+    title.style.display = '';
+    fields.style.display = 'none';
+    title.textContent = cfg.name;
   }
+  updateEditBtns(name, !!st.editing);
+}
+
+function updateEditBtns(name, editing) {
+  const editBtn = document.getElementById('edit-btn-'+cssEscape(name));
+  const cloneBtn = document.getElementById('clone-btn-'+cssEscape(name));
+  if (editBtn) editBtn.style.display = editing ? 'none' : 'inline-flex';
+  if (cloneBtn) cloneBtn.style.display = editing ? 'none' : 'inline-flex';
 }
 
 async function toggleEdit(name) {
   const cfg = configs.find(c => c.name === name);
   if (!cfg || cfg.running) return;
-
   const st = cardState[name];
   if (!st) return;
 
   if (expandedCard !== name) {
     focusCard(name);
-    toggleExpand(name);
-    st.editing = true;
-  } else if (st.editing) {
-    await confirmEdit(name);
-    return;
+    toggleExpand(name, true);
   } else {
     st.editing = true;
+    updateCardHeader(name);
+    const runBtn = document.getElementById('card-'+cssEscape(name))?.querySelector('.toolbar-btn.run, .toolbar-btn.stop');
+    if (runBtn) runBtn.disabled = true;
   }
-
-  updateCardHeader(name);
-  const btn = document.getElementById('edit-btn-'+cssEscape(name));
-  if (btn) { btn.textContent = '✓'; btn.title = 'Save changes'; btn.classList.add('confirm'); }
-  const runBtn = document.getElementById('card-'+cssEscape(name))?.querySelector('.toolbar-btn.run, .toolbar-btn.stop');
-  if (runBtn) runBtn.disabled = true;
 }
 
 async function confirmEdit(name) {
@@ -1544,53 +1646,115 @@ async function confirmEdit(name) {
     return;
   }
 
-  st.editing = false;
-
-  if (newName !== cfg.name) {
+  if (st.isNew) {
+    if (st.mode === 'raw' && rawInput[name] !== undefined) {
+      parseFullCmd(rawInput[name], name);
+      delete rawInput[name];
+    }
     try {
-      const r = await fetch('/api/card/rename', {
+      const r = await fetch('/api/card/create', {
         method: 'POST',
-        body: new URLSearchParams({name, new_name: newName})
+        body: new URLSearchParams({name: newName})
       });
       if (!r.ok) {
         const err = await r.text();
         showToast('Error: ' + err, 'err');
+        return;
+      }
+      const argsSt = cfg.args_str || '';
+      const envSt = cfg.env_str || '';
+      const rt = cfg.runtime || '';
+      const params = new URLSearchParams({name: newName, args_str: argsSt, env_str: envSt, runtime: rt});
+      if (desc) params.set('description', desc);
+      const r2 = await fetch('/api/config/update', { method: 'POST', body: params });
+      if (!r2.ok) showToast('Card created but config save failed', 'err');
+      delete st.isNew;
+      await reloadAll();
+      focusCard(newName);
+      showToast('➕ Card created', 'ok');
+    } catch(e) {
+      showToast('Create error', 'err');
+      return;
+    }
+  } else {
+    if (newName !== cfg.name) {
+      try {
+        const r = await fetch('/api/card/rename', {
+          method: 'POST',
+          body: new URLSearchParams({name, new_name: newName})
+        });
+        if (!r.ok) {
+          const err = await r.text();
+          showToast('Error: ' + err, 'err');
+          st.editing = true;
+          updateCardHeader(name);
+          return;
+        }
+        if (desc) {
+          const newCfg = configs.find(c => c.name === newName);
+          if (newCfg) {
+            newCfg.description = desc;
+            await fetch('/api/config/update', {
+              method: 'POST',
+              body: new URLSearchParams({name: newName, args_str: newCfg.args_str, env_str: newCfg.env_str || '', runtime: newCfg.runtime || '', description: desc})
+            });
+          }
+        }
+        await reloadAll();
+        focusCard(newName);
+        showToast('✏️ Card updated', 'ok');
+        return;
+      } catch(e) {
+        showToast('Rename error', 'err');
         st.editing = true;
         updateCardHeader(name);
         return;
       }
-      if (desc) {
-        const newCfg = configs.find(c => c.name === newName);
-        if (newCfg) {
-          newCfg.description = desc;
-          await fetch('/api/config/update', {
-            method: 'POST',
-            body: new URLSearchParams({name: newName, args_str: newCfg.args_str, env_str: newCfg.env_str || '', runtime: newCfg.runtime || '', description: desc})
-          });
-        }
-      }
-      await reloadAll();
-      focusCard(newName);
-      showToast('✏️ Card updated', 'ok');
-      return;
-    } catch(e) {
-      showToast('Rename error', 'err');
-      st.editing = true;
-      updateCardHeader(name);
-      return;
+    }
+
+    if (cfg.description !== desc) {
+      cfg.description = desc;
+      await saveCardConfig(name);
     }
   }
 
-  if (cfg.description !== desc) {
-    cfg.description = desc;
-    await saveCardConfig(name);
-  }
-
+  st.editing = false;
   updateCardHeader(name);
-  const btn = document.getElementById('edit-btn-'+cssEscape(name));
-  if (btn) { btn.textContent = '✏️'; btn.title = 'Edit card'; btn.classList.remove('confirm'); }
   const runBtn = document.getElementById('card-'+cssEscape(name))?.querySelector('.toolbar-btn.run, .toolbar-btn.stop');
   if (runBtn) runBtn.disabled = false;
+}
+
+async function cancelEdit(name) {
+  const st = cardState[name];
+  if (!st) return;
+
+  st.editing = false;
+
+  if (st.isNew) {
+    const idx = configs.findIndex(c => c.name === name);
+    if (idx >= 0) configs.splice(idx, 1);
+    delete cardState[name];
+    if (focusedCard === name) focusedCard = null;
+    if (expandedCard === name) {
+      expandedCard = null;
+      const container = document.getElementById('cardsContainer');
+      if (container) container.classList.remove('expanded');
+    }
+    renderCards();
+    if (configs.length) focusCard(configs[0].name);
+    updateGlobalExpandBtn();
+  } else {
+    const cfg = configs.find(c => c.name === name);
+    if (cfg) {
+      cfg.args_str = st.originalArgs;
+      cfg.env_str = st.originalEnv;
+      cfg.runtime = st.originalRuntime;
+      updateArgsSection(name);
+    }
+    updateCardHeader(name);
+    const runBtn = document.getElementById('card-'+cssEscape(name))?.querySelector('.toolbar-btn.run, .toolbar-btn.stop');
+    if (runBtn) runBtn.disabled = false;
+  }
 }
 
 function toggleScrollPause(name) {
@@ -1661,22 +1825,7 @@ function updateCardsStatus() {
         '<button class="toolbar-btn web-btn hidden" onclick="window.open(location.protocol+\'//\'+location.hostname+\':\'+'+(c.port||8080)+')" title="Open chat">🌐</button>';
     }
 
-    const editBtn = document.getElementById('edit-btn-'+cssEscape(c.name));
-    if (editBtn) {
-      if (c.running) {
-        editBtn.classList.add('disabled');
-        editBtn.title = 'Cannot edit while running';
-      } else if (cardState[c.name]?.editing) {
-        editBtn.textContent = '✓';
-        editBtn.title = 'Save changes';
-        editBtn.classList.add('confirm');
-        editBtn.classList.remove('disabled');
-      } else {
-        editBtn.textContent = '✏️';
-        editBtn.title = 'Edit card';
-        editBtn.classList.remove('confirm', 'disabled');
-      }
-    }
+    updateEditBtns(c.name, !!cardState[c.name]?.editing);
   });
 }
 

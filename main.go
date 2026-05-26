@@ -454,6 +454,11 @@ func handleGlobalConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	if r.Form.Has("runtime") {
 		globalRuntime = r.FormValue("runtime")
+		for i := range configs {
+			if configs[i].Runtime == globalRuntime {
+				configs[i].Runtime = ""
+			}
+		}
 	}
 	if r.Form.Has("hf_cache") {
 		globalHfCache = r.FormValue("hf_cache")

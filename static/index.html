@@ -10,21 +10,22 @@
   <div class="header">
     <div class="header-left">
       <div class="global-menu">
-        <button class="global-menu-btn" id="settingsBtn" onclick="showSettingsDialog()" title="Application settings">⚙️</button>
+        <button class="global-menu-btn" id="expandBtn" onclick="toggleExpand()" disabled title="Expand card">⛶</button>
         <span class="global-menu-sep"></span>
-        <button class="global-menu-btn" id="addCardBtn" onclick="showAddCardDialog()" title="Add card">➕</button>
+        <button class="global-menu-btn" id="addCardBtn" onclick="addQuickCard()" title="Add card">➕</button>
         <button class="global-menu-btn" id="deleteCardBtn" onclick="deleteFocusedCard()" disabled title="Delete card">🗑️</button>
       </div>
     </div>
     <div class="gpu-panel" id="gpuInfo"></div>
     <div class="header-right">
-      <input class="search" id="searchInput" type="text" placeholder="🔍 Search models..." oninput="renderCards()">
-      <span style="color:#484f58;font-size:14px;line-height:1">⇅</span>
-      <div class="sort-group">
-        <button class="sort-btn active" data-sort="recent" onclick="setSortMode('recent')" title="Sort by last used">🕐</button>
-        <button class="sort-btn" data-sort="name" onclick="setSortMode('name')" title="Sort by name">Aa</button>
+      <div class="search-wrap">
+        <input class="search" id="searchInput" type="text" placeholder="🔍 Search models..." oninput="renderCards()">
+        <div class="sort-group">
+          <button class="sort-btn active" data-sort="recent" onclick="setSortMode('recent')" title="Sort by last used">🕐</button>
+          <button class="sort-btn" data-sort="name" onclick="setSortMode('name')" title="Sort by name">Aa</button>
+        </div>
       </div>
-      <button class="global-menu-btn" id="expandBtn" onclick="toggleExpand()" disabled title="Expand card">⛶</button>
+      <button class="global-menu-btn" id="settingsBtn" onclick="showSettingsDialog()" title="Application settings">⚙️</button>
       <h1>7L</h1>
     </div>
   </div>

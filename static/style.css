@@ -25,12 +25,13 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; c
 .global-menu-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── Search ── */
-.search { padding: 8px 14px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; width: 280px; font-size: 14px; outline: none; }
+.search-wrap { position: relative; display: inline-flex; align-items: center; }
+.search { padding: 8px 14px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; width: 280px; font-size: 14px; outline: none; padding-right: 72px; }
 .search:focus { border-color: #58a6ff; }
 
-/* ── Sort ── */
-.sort-group { display: inline-flex; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; }
-.sort-btn { padding: 4px 8px; font-size: 14px; background: #161b22; color: #8b949e; border: none; cursor: pointer; border-right: 1px solid #30363d; line-height: 1; font-family: system-ui, -apple-system, sans-serif; }
+/* ── Sort (inside search) ── */
+.sort-group { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: inline-flex; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; pointer-events: auto; }
+.sort-btn { padding: 3px 7px; font-size: 13px; background: #161b22; color: #8b949e; border: none; cursor: pointer; border-right: 1px solid #30363d; line-height: 1; font-family: system-ui, -apple-system, sans-serif; }
 .sort-btn:last-child { border-right: none; }
 .sort-btn:hover:not(.disabled) { background: #1f6feb33; }
 .sort-btn.active { background: #1f6feb33; color: #58a6ff; }
@@ -66,18 +67,25 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; c
 }
 
 /* ── Card footer ── */
-.edit-btn { background: none; border: none; color: #484f58; cursor: pointer; font-size: 13px; width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; line-height: 1; transition: all .15s; flex-shrink: 0; }
-.edit-btn:hover { color: #c9d1d9; background: #21262d; }
-.edit-btn.confirm { color: #3fb950; }
+.edit-btn { background: none; border: none; color: #484f58; cursor: pointer; font-size: 13px; width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; line-height: 1; transition: opacity .15s; flex-shrink: 0; opacity: 0; pointer-events: none; }
+.args-controls:hover .edit-btn, .edit-btn:hover { opacity: 1; pointer-events: auto; }
+.clone-btn { font-size: 12px; }
+.clone-btn:hover { color: #58a6ff; }
+.edit-btn.confirm { opacity: 1; pointer-events: auto; color: #3fb950; }
 .edit-btn.confirm:hover { color: #56d364; }
-.edit-btn.disabled { opacity: .35; cursor: not-allowed; pointer-events: none; }
+.edit-save { opacity: 1 !important; pointer-events: auto !important; color: #3fb950; padding: 4px 10px; width: auto; font-size: 12px; }
+.edit-save:hover { color: #56d364; background: #23863633; border-radius: 4px; }
+.edit-cancel { opacity: 1 !important; pointer-events: auto !important; color: #f85149; padding: 4px 10px; width: auto; font-size: 12px; margin-left: 2px; }
+.edit-cancel:hover { color: #ff7b72; background: #da363333; border-radius: 4px; }
+.card.running .edit-btn { display: none; }
 
 /* ── Card edit fields ── */
-.card-edit-fields { display: flex; align-items: center; gap: 8px; margin: 0 12px; flex: 1; min-width: 0; }
+.card-edit-fields { display: flex; flex-direction: column; gap: 6px; margin: 0 12px; flex: 1; min-width: 0; }
+.card-edit-fields .card-edit-row { display: flex; align-items: center; gap: 8px; }
 .card-name-input, .card-desc-input { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 14px; padding: 3px 8px; outline: none; font-family: inherit; }
 .card-name-input { width: auto; min-width: 120px; font-weight: 600; }
 .card-name-input:focus { border-color: #58a6ff; }
-.card-desc-input { flex: 1; min-width: 100px; font-size: 13px; color: #8b949e; }
+.card-desc-input { flex: 1; min-width: 100px; font-size: 13px; color: #8b949e; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 3px 8px; outline: none; font-family: inherit; resize: vertical; }
 .card-desc-input:focus { border-color: #58a6ff; }
 .card-desc-input::placeholder { color: #484f58; }
 
@@ -141,6 +149,8 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; c
 .toolbar-btn:hover { background: #1f6feb33; }
 .toolbar-btn.run { color: #3fb950; }
 .toolbar-btn.run:hover { background: #23863633; }
+.toolbar-btn[data-mode="raw"] { color: #3fb950; font-weight: 700; }
+.toolbar-btn[data-mode="raw"]:hover { background: #23863633; }
 .toolbar-btn.stop { color: #f85149; }
 .toolbar-btn.stop:hover { background: #da363333; }
 .toolbar-btn.active { background: #1f6feb; color: #fff; }

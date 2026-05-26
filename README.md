@@ -4,6 +4,30 @@
 
 ## Quick Start
 
+### Download a release
+
+Grab the latest binary for your platform from the [releases page](https://github.com/shakhor-shual/7L/releases):
+
+```bash
+# Linux (amd64)
+curl -LO https://github.com/shakhor-shual/7L/releases/latest/download/7L-linux-amd64
+chmod +x 7L-linux-amd64
+./7L-linux-amd64
+
+# macOS (amd64)
+curl -LO https://github.com/shakhor-shual/7L/releases/latest/download/7L-darwin-amd64
+chmod +x 7L-darwin-amd64
+./7L-darwin-amd64
+
+# Windows (amd64, in PowerShell)
+# curl -LO https://github.com/shakhor-shual/7L/releases/latest/download/7L-windows-amd64.exe
+# .\7L-windows-amd64.exe
+```
+
+Open **http://localhost:7777** in your browser.
+
+### Using the UI
+
 1. Click **➕** in the header to add a card. Give it a nickname.
 2. Use **📐 Constructor mode** to pick a model file (`-m`), set context size (`--ctx-size`), and add other parameters.
 3. Optionally set a **custom runtime** by clicking **🦙** on the card, or configure a global runtime in settings.

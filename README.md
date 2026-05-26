@@ -4,29 +4,26 @@
 
 ![7L screenshot](7L.png)
 
+> **Note:** 7L does **not** install, bundle, or compile llama.cpp. You need to have a `llama-server` binary installed on your system separately (build from source, download a release, or use a package manager).
+
 ## Quick Start
 
-### Download a release
+### GUI quickstart
 
-Grab the latest binary for your platform from the [releases page](https://github.com/shakhor-shual/7L/releases):
+1. Download the [latest release](https://github.com/shakhor-shual/7L/releases) for your platform
+2. Run the downloaded file
+3. Open **http://localhost:7777** in your browser
+
+### CLI quickstart (Linux / macOS)
 
 ```bash
-# Linux (amd64)
 curl -LO https://github.com/shakhor-shual/7L/releases/latest/download/7L-linux-amd64
 chmod +x 7L-linux-amd64
 ./7L-linux-amd64
-
-# macOS (amd64)
-curl -LO https://github.com/shakhor-shual/7L/releases/latest/download/7L-darwin-amd64
-chmod +x 7L-darwin-amd64
-./7L-darwin-amd64
-
-# Windows (amd64, in PowerShell)
-# curl -LO https://github.com/shakhor-shual/7L/releases/latest/download/7L-windows-amd64.exe
-# .\7L-windows-amd64.exe
+# Open http://localhost:7777
 ```
 
-Open **http://localhost:7777** in your browser.
+For macOS, replace `linux` with `darwin`.
 
 ### Using the UI
 
